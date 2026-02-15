@@ -11,7 +11,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "vite build && electron-builder"
+    "electron:build": "cross-env VITE_BASE_PATH=./ vite build && electron-builder",
+    "predeploy": "vite build",
+    "deploy": "gh-pages -d dist"
   },
   "build": {
     "appId": "com.omniview.app",
@@ -43,6 +45,7 @@
     "cross-env": "^10.1.0",
     "electron": "^40.4.1",
     "electron-builder": "^26.7.0",
+    "gh-pages": "^6.3.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "wait-on": "^9.0.4"
