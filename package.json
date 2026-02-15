@@ -1,0 +1,50 @@
+{
+  "name": "omniview-business-ai",
+  "private": true,
+  "version": "0.0.0",
+  "description": "OmniView Business Intelligence Agent",
+  "author": "OmniView AI",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron:build": "vite build && electron-builder"
+  },
+  "build": {
+    "appId": "com.omniview.app",
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business",
+      "identity": null
+    }
+  },
+  "dependencies": {
+    "@google/genai": "^1.41.0",
+    "lucide-react": "^0.564.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "recharts": "^3.7.0",
+    "vite-plugin-pwa": "^1.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^40.4.1",
+    "electron-builder": "^26.7.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0",
+    "wait-on": "^9.0.4"
+  }
+}

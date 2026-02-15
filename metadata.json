@@ -1,0 +1,7 @@
+{
+  "name": "OmniView Business AI",
+  "description": "全方位 AI 商業顧問，模擬多元利益相關者（投資人、競爭對手、客戶）組成的董事會，利用商業畫布方法論評估新創企業和企業提案。",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
