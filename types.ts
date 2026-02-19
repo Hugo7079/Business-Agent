@@ -1,26 +1,18 @@
 export enum AnalysisMode {
-  STARTUP = 'STARTUP',
-  CORPORATE = 'CORPORATE',
+  BUSINESS = 'BUSINESS',
 }
 
-export interface GeneralInput {
+export interface BusinessInput {
+  idea: string;
   marketData: string;
   productDetails: string;
-  literature: string; // References/Data
   painPoints: string;
-  techInnovation: string;
-}
-
-export interface CorporateInput {
-  brandTraits: string;
   targetConsumer: string;
-  channels: string;
-  proposalGoal: string;
-  financialReport: string;
+  financialContext: string;
 }
 
 export interface ParsedInputResponse {
-  data: GeneralInput | CorporateInput;
+  data: BusinessInput;
   feedback: string;
 }
 

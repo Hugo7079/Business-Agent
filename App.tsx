@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppState, AnalysisMode, GeneralInput, CorporateInput, AnalysisResult } from './types';
+import { AppState, AnalysisMode, BusinessInput, AnalysisResult } from './types';
 import InputForm from './components/InputForm';
 import AnalysisDashboard from './components/AnalysisDashboard';
 import { analyzeBusiness } from './services/geminiService';
@@ -32,13 +32,14 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const handleAnalyze = async (mode: AnalysisMode, data: GeneralInput | CorporateInput) => {
+  const handleAnalyze = async (mode: AnalysisMode, data: BusinessInput) => {
     setAppState('ANALYZING'); setError(null);
     try {
       const analysisResult = await analyzeBusiness(mode, data);
       setResult(analysisResult); setAppState('COMPLETE');
     } catch (err: any) {
-      setError(err.message || "模擬過程中發生意外錯誤。"); setAppState('ERROR');
+      setError(err.message || '模擬過程中發生意外錯誤。');
+      setAppState('ERROR');
     }
   };
 
@@ -80,7 +81,7 @@ const App: React.FC = () => {
                   <div className="spin-ring spin-ring-3" />
                 </div>
                 <h2 className="loading-title">OmniView 董事會正在開會</h2>
-                <p className="loading-sub">正在模擬投資人、競爭對手和客戶的觀點。正在運算市場數據並評估風險...</p>
+                <p className="loading-sub">正在模擬投資人、競爭對手和客戶的觀點，運算市場數據並評估風險...</p>
               </div>
             </>
           )}
@@ -89,8 +90,13 @@ const App: React.FC = () => {
             <div className="error-box">
               <div className="error-icon"><AlertCircle size={48} /></div>
               <h3 className="error-title">分析失敗</h3>
-              <p className="error-msg">{error}</p>
-              <button className="error-retry-btn" onClick={handleReset}>重試</button>
+              <p className="error-msg" style={{ whiteSpace: 'pre-line' }}>{error}</p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button className="error-retry-btn" onClick={handleReset}>重試</button>
+                <button className="error-retry-btn" style={{ background: '#1e40af' }} onClick={() => setIsSettingsOpen(true)}>
+                  設定 API Key
+                </button>
+              </div>
             </div>
           )}
 

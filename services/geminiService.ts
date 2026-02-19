@@ -1,12 +1,11 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { AnalysisMode, GeneralInput, CorporateInput, AnalysisResult, ParsedInputResponse } from "../types";
+import { AnalysisMode, BusinessInput, AnalysisResult, ParsedInputResponse } from "../types";
 
-// Define the response schema strictly to ensure UI can render it.
 const analysisSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    successProbability: { type: Type.NUMBER, description: "Overall success probability percentage (0-100)" },
-    executiveSummary: { type: Type.STRING, description: "A high-level summary of the entire analysis." },
+    successProbability: { type: Type.NUMBER },
+    executiveSummary: { type: Type.STRING },
     marketAnalysis: {
       type: Type.OBJECT,
       properties: {
@@ -31,10 +30,10 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          phase: { type: Type.STRING, description: "Phase 1, Phase 2, etc." },
-          timeframe: { type: Type.STRING, description: "e.g., Q1 2024" },
-          technology: { type: Type.STRING, description: "Tech milestones" },
-          product: { type: Type.STRING, description: "Product milestones" },
+          phase: { type: Type.STRING },
+          timeframe: { type: Type.STRING },
+          technology: { type: Type.STRING },
+          product: { type: Type.STRING },
         },
       },
     },
@@ -43,14 +42,14 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          year: { type: Type.STRING, description: "Year 1, Year 2..." },
+          year: { type: Type.STRING },
           revenue: { type: Type.NUMBER },
           profit: { type: Type.NUMBER },
           costs: { type: Type.NUMBER },
         },
       },
     },
-    breakEvenPoint: { type: Type.STRING, description: "Estimated time to break even." },
+    breakEvenPoint: { type: Type.STRING },
     risks: {
       type: Type.ARRAY,
       items: {
@@ -67,228 +66,170 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          role: { type: Type.STRING, description: "e.g., Investor, Competitor, Customer" },
-          icon: { type: Type.STRING, description: "Just a keyword: 'money', 'user', 'shield', 'briefcase', 'hammer'" },
-          perspective: { type: Type.STRING, description: "Their specific point of view." },
-          score: { type: Type.NUMBER, description: "Score 0-100 from their perspective." },
-          keyQuote: { type: Type.STRING, description: "A fictional quote representing their stance." },
-          concern: { type: Type.STRING, description: "Their biggest worry." },
+          role: { type: Type.STRING },
+          icon: { type: Type.STRING },
+          perspective: { type: Type.STRING },
+          score: { type: Type.NUMBER },
+          keyQuote: { type: Type.STRING },
+          concern: { type: Type.STRING },
         },
       },
     },
-    teamAnalysis: { type: Type.STRING, description: "Analysis of required team capabilities." },
+    teamAnalysis: { type: Type.STRING },
     finalVerdicts: {
       type: Type.OBJECT,
       properties: {
-        aggressive: { type: Type.STRING, description: "Opinion from an aggressive growth perspective." },
-        balanced: { type: Type.STRING, description: "Opinion from a balanced/realistic perspective." },
-        conservative: { type: Type.STRING, description: "Opinion from a risk-averse perspective." },
+        aggressive: { type: Type.STRING },
+        balanced: { type: Type.STRING },
+        conservative: { type: Type.STRING },
       },
     },
   },
   required: [
-    "successProbability",
-    "executiveSummary",
-    "marketAnalysis",
-    "competitors",
-    "roadmap",
-    "financials",
-    "breakEvenPoint",
-    "risks",
-    "personaEvaluations",
-    "teamAnalysis",
-    "finalVerdicts"
+    "successProbability", "executiveSummary", "marketAnalysis", "competitors",
+    "roadmap", "financials", "breakEvenPoint", "risks",
+    "personaEvaluations", "teamAnalysis", "finalVerdicts"
   ],
 };
 
-const startupParserSchema: Schema = {
+const businessParserSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     data: {
       type: Type.OBJECT,
       properties: {
+        idea: { type: Type.STRING },
         marketData: { type: Type.STRING },
         productDetails: { type: Type.STRING },
-        literature: { type: Type.STRING },
         painPoints: { type: Type.STRING },
-        techInnovation: { type: Type.STRING },
+        targetConsumer: { type: Type.STRING },
+        financialContext: { type: Type.STRING },
       },
-      required: ["marketData", "productDetails", "literature", "painPoints", "techInnovation"]
+      required: ["idea", "marketData", "productDetails", "painPoints", "targetConsumer", "financialContext"]
     },
-    feedback: { type: Type.STRING, description: "Explanation of what was extracted, inferred, or is missing. Output in Traditional Chinese." }
+    feedback: { type: Type.STRING }
   },
   required: ["data", "feedback"]
 };
 
-const corporateParserSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    data: {
-      type: Type.OBJECT,
-      properties: {
-        brandTraits: { type: Type.STRING },
-        targetConsumer: { type: Type.STRING },
-        channels: { type: Type.STRING },
-        proposalGoal: { type: Type.STRING },
-        financialReport: { type: Type.STRING },
-      },
-      required: ["brandTraits", "targetConsumer", "channels", "proposalGoal", "financialReport"]
-    },
-    feedback: { type: Type.STRING, description: "Explanation of what was extracted, inferred, or is missing. Output in Traditional Chinese." }
-  },
-  required: ["data", "feedback"]
+// 統一的 API 配額錯誤偵測
+const handleApiError = (error: any): never => {
+  const msg: string = error?.message || String(error);
+  if (
+    msg.includes('429') ||
+    msg.includes('quota') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('rate limit') ||
+    msg.includes('Too Many Requests')
+  ) {
+    throw new Error(
+      '⚠️ API 配額已用盡\n\n您的 Gemini API Key 已達到免費方案的用量上限。\n\n解決方式：\n• 等待配額重置（通常每分鐘或每天重置）\n• 前往 Google AI Studio 升級至付費方案\n• 使用不同的 API Key'
+    );
+  }
+  if (msg.includes('API_KEY_INVALID') || msg.includes('invalid') || msg.includes('401')) {
+    throw new Error('❌ API Key 無效\n\n請點擊右上角設定按鈕，重新輸入正確的 Gemini API Key。');
+  }
+  throw error;
+};
+
+const getApiKey = (): string => {
+  const key = localStorage.getItem('GEMINI_API_KEY') || process.env.API_KEY || '';
+  if (!key) throw new Error('找不到 API Key。請點擊右上角設定按鈕輸入您的 Google Gemini API Key。');
+  return key;
 };
 
 export const parseBusinessIdea = async (
-  mode: AnalysisMode,
+  _mode: AnalysisMode,
   textInput: string,
   audioBase64?: string
 ): Promise<ParsedInputResponse> => {
-  const apiKey = localStorage.getItem('GEMINI_API_KEY') || process.env.API_KEY;
-  
-  if (!apiKey) {
-    throw new Error("找不到 API Key。請點擊右上角設定按鈕輸入您的 Google Gemini API Key。");
-  }
+  const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  const isStartup = mode === AnalysisMode.STARTUP;
-  const targetSchema = isStartup ? startupParserSchema : corporateParserSchema;
-  const fields = isStartup 
-    ? "市場資料 (Market Data), 產品細節 (Product Details), 文獻/參考資料 (Literature/References), 市場痛點 (Pain Points), 技術創新點 (Tech Innovation)"
-    : "品牌特性 (Brand Traits), 目標消費者 (Target Consumer), 主要通路 (Channels), 提案目的 (Proposal Goal), 財務報告 (Financial Context)";
+  const prompt = `你是一位專業的商業分析助理。
+使用者將描述一個商業想法或提案（文字或語音）。
 
-  const prompt = `
-    You are an intelligent business analyst assistant. 
-    The user will provide a rough description of a business idea or proposal (via text or audio).
-    
-    Your task is to:
-    1. Organize this information into the structured fields required for a Business Model Canvas analysis: ${fields}.
-    2. If the user does not provide specific details for a field, you must **INFER reasonable assumptions** based on the context to ensure the form is filled. Do not leave fields empty if possible.
-    3. In the 'feedback' field, clearly summarize what you extracted and specifically mention what you had to infer or assume so the user knows.
-    
-    **IMPORTANT**: The 'feedback' and all extracted string fields MUST be in Traditional Chinese (繁體中文).
-    
-    Mode: ${isStartup ? "New Venture / Startup" : "Corporate Brand Proposal"}
-  `;
+請將其整理成以下結構化欄位：
+- idea: 核心想法一句話摘要
+- marketData: 市場規模、趨勢、CAGR 等
+- productDetails: 產品或服務的具體細節
+- painPoints: 解決的市場痛點
+- targetConsumer: 目標客群描述
+- financialContext: 預算、營收目標、財務背景
 
-  const contents = [];
-  
+若使用者未提供某欄位，請根據上下文合理推斷並填入。
+在 feedback 欄位說明你提取了什麼、推斷了什麼。
+所有輸出必須使用繁體中文。
+
+用戶輸入：${textInput || '（處理語音輸入中）'}`;
+
+  const contents: any[] = [];
   if (audioBase64) {
-    contents.push({
-      inlineData: {
-        mimeType: "audio/webm", // Common for browser MediaRecorder
-        data: audioBase64
-      }
-    });
+    contents.push({ inlineData: { mimeType: 'audio/webm', data: audioBase64 } });
   }
-  
-  contents.push({
-    text: prompt + `\n\nUser Input: ${textInput || "(Processing Audio Input)"}`
-  });
+  contents.push({ text: prompt });
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
+      model: 'gemini-2.0-flash',
       contents: [{ role: 'user', parts: contents }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: targetSchema,
-      },
+      config: { responseMimeType: 'application/json', responseSchema: businessParserSchema },
     });
-
-    const text = response.text;
-    if (!text) throw new Error("Failed to parse input");
-    
-    return JSON.parse(text) as ParsedInputResponse;
+    return JSON.parse(response.text!) as ParsedInputResponse;
   } catch (error) {
-    console.error("Input Parsing Error:", error);
-    throw error;
+    handleApiError(error);
   }
 };
 
 export const analyzeBusiness = async (
-  mode: AnalysisMode,
-  data: GeneralInput | CorporateInput
+  _mode: AnalysisMode,
+  data: BusinessInput
 ): Promise<AnalysisResult> => {
-  const apiKey = localStorage.getItem('GEMINI_API_KEY') || process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("找不到 API Key。請點擊右上角設定按鈕輸入您的 Google Gemini API Key。");
-  }
-
+  const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  let systemPrompt = `
-    You are OmniView, an advanced AI Business Simulator. 
-    Your goal is to simulate a "Board of Directors" meeting composed of different AI personas (Investor, Competitor, Supplier, Employee, Consumer) to strictly evaluate a business opportunity.
-    
-    You must provide a 360-degree assessment covering:
-    1. Market Size & Growth
-    2. Competitor Analysis
-    3. Tech & Product Roadmap
-    4. Team Capabilities
-    5. Resource & Time Allocation
-    6. Financial Projections (P&L) & ROI
-    7. Risk Factors
-    8. Three distinct final verdicts: Aggressive, Balanced, Conservative.
+  const prompt = `你是 OmniView，一個進階 AI 商業模擬系統。
+你的任務是模擬一場「董事會會議」，由不同 AI 角色（投資人、競爭對手、供應商、員工、消費者）對以下商業提案進行全方位 360° 嚴格評估。
 
-    Be critical, realistic, and data-driven where possible based on your general knowledge.
-    Avoid vague platitudes. Give specific numbers for financials (estimates) and concrete risks.
+評估範圍：
+1. 市場規模與成長性
+2. 競爭對手分析
+3. 產品與技術路線圖
+4. 團隊能力需求
+5. 資源與時間配置
+6. 財務預測（損益）與 ROI
+7. 風險因素與因應策略
+8. 三種最終裁決：激進、平衡、保守
 
-    **IMPORTANT**: ALL OUTPUT MUST BE IN TRADITIONAL CHINESE (繁體中文).
-  `;
+請給出具體數字，避免空泛描述。所有輸出必須使用繁體中文。
 
-  let userPrompt = "";
-
-  if (mode === AnalysisMode.STARTUP) {
-    const input = data as GeneralInput;
-    userPrompt = `
-      請評估這個新創想法 (EVALUATE THIS STARTUP IDEA):
-      - 市場資料 (Market Data Context): ${input.marketData}
-      - 產品細節 (Product Details): ${input.productDetails}
-      - 相關文獻/資料 (Related Literature/Data): ${input.literature}
-      - 市場痛點 (Market Pain Points): ${input.painPoints}
-      - 技術創新點 (Tech Innovation): ${input.techInnovation}
-    `;
-  } else {
-    const input = data as CorporateInput;
-    userPrompt = `
-      請評估這個企業提案 (EVALUATE THIS CORPORATE PROPOSAL):
-      - 品牌特性 (Brand Traits): ${input.brandTraits}
-      - 目標消費者 (Target Consumer): ${input.targetConsumer}
-      - 主要通路 (Main Channels): ${input.channels}
-      - 提案目的 (Proposal Goal): ${input.proposalGoal}
-      - 財務報告 (Financial Context): ${input.financialReport}
-    `;
-  }
+商業提案資料：
+- 核心想法：${data.idea}
+- 市場資料：${data.marketData}
+- 產品細節：${data.productDetails}
+- 市場痛點：${data.painPoints}
+- 目標客群：${data.targetConsumer}
+- 財務背景：${data.financialContext}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Using Pro for complex reasoning and role simulation
-      contents: [
-        { role: 'user', parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
-      ],
+      model: 'gemini-2.5-pro-preview-05-06',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: analysisSchema,
-        thinkingConfig: { thinkingBudget: 4096 } // Allow detailed thinking for financial models
+        thinkingConfig: { thinkingBudget: 4096 },
       },
     });
-
-    const text = response.text;
-    if (!text) throw new Error("No response generated");
-    
-    return JSON.parse(text) as AnalysisResult;
+    return JSON.parse(response.text!) as AnalysisResult;
   } catch (error) {
-    console.error("Gemini Analysis Error:", error);
-    throw error;
+    handleApiError(error);
   }
 };
 
 export const generatePptNotebook = async (result: AnalysisResult): Promise<string> => {
-  const apiKey = localStorage.getItem('GEMINI_API_KEY') || process.env.API_KEY;
-  if (!apiKey) throw new Error("找不到 API Key。");
+  const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
-
   const dataJson = JSON.stringify(result, null, 2);
 
   const prompt = `
@@ -298,109 +239,75 @@ Generate a COMPLETE, RUNNABLE Python script that creates a stunning investor-gra
 The script will be run in a Jupyter Notebook environment. ALL text content MUST be in Traditional Chinese (繁體中文).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ARCHITECTURE — TWO TYPES OF VISUALS:
+ARCHITECTURE — THREE TYPES OF VISUALS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 TYPE A — AI-GENERATED IMAGES (use google-generativeai with imagen-3.0-generate-002):
   Use this for: slide backgrounds, hero illustrations, conceptual images.
   Method:
     import google.generativeai as genai
+    from google.generativeai.types import GenerateImagesConfig
     import base64, io
-    genai.configure(api_key=YOUR_API_KEY)
-    client = genai.Client()
+    client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY',''))
     response = client.models.generate_images(
         model='imagen-3.0-generate-002',
         prompt='...',
         config=GenerateImagesConfig(number_of_images=1, aspect_ratio="16:9", output_mime_type='image/png')
     )
     img_bytes = base64.b64decode(response.generated_images[0].image.image_bytes)
-    # Then add to slide as background or picture
+  Wrap every Imagen call in try/except — if it fails, fall back to a matplotlib gradient background.
 
-TYPE B — MATPLOTLIB CHARTS (use only for data/numbers):
-  Use this for: financial bar charts, risk scatter plots, persona radar charts, roadmap gantt.
-  Always use: dark bg (#1e293b), white text, dpi=150, BytesIO to embed.
-  Font: plt.rcParams['font.family'] = ['Arial Unicode MS', 'PingFang TC', 'Heiti TC', 'sans-serif']
+TYPE B — MATPLOTLIB CHARTS (only for data/numbers):
+  Financial bar charts, risk scatter, persona radar, roadmap gantt.
+  Dark bg (#1e293b), white text, dpi=150, save to BytesIO.
+  plt.rcParams['font.family'] = ['Arial Unicode MS', 'PingFang TC', 'Heiti TC', 'sans-serif']
 
-TYPE C — PYTHON-PPTX TABLES (use only for structured comparison data):
-  Use this for: competitive landscape table, roadmap milestone table.
-  Style with dark header (#1e3a5f), alternating rows (#1e293b / #0f172a), white text.
+TYPE C — PYTHON-PPTX TABLES (only for structured comparison):
+  Competitive landscape, roadmap milestones.
+  Dark header (#1e3a5f), alternating rows (#1e293b / #0f172a), white text.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SLIDE STRUCTURE (10 slides):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-SLIDE 1 — COVER
-  - TYPE A background: "cinematic dark navy abstract technology background, deep space particles, subtle blue glow, 16:9, ultra HD, no text"
-  - TYPE A hero image: A photorealistic illustration matching the business domain (infer from the analysis data what industry it is)
-  - Large title text (white, bold), tagline, success probability as a giant colored number overlay
-
-SLIDE 2 — EXECUTIVE SUMMARY  
-  - TYPE A background: "dark abstract gradient background, deep blue and indigo tones, smooth waves, 16:9, professional"
-  - Key bullet points as large readable text with ◆ prefix
-  - Semi-transparent dark overlay card for text readability
-
-SLIDE 3 — MARKET OPPORTUNITY
-  - TYPE A background: "dark market cityscape aerial view at night, blue lights, 16:9, cinematic"
-  - TYPE B chart: Horizontal bar chart showing market size breakdown with gradient bars
-  - KPI numbers (TAM, CAGR) as large overlay text
-
-SLIDE 4 — FINANCIAL PROJECTIONS
-  - Solid dark background (#0f172a) — no AI image needed, chart is the hero
-  - TYPE B chart: Grouped bar chart (Revenue/Profit/Cost by year), full width, high quality
-  - TYPE C mini table: Year / Revenue / Profit / Cost below the chart
-
-SLIDE 5 — COMPETITIVE LANDSCAPE
-  - TYPE A background: "abstract dark chess board strategy game concept, blue tones, 16:9"
-  - TYPE C table: Competitor / Strength / Weakness — styled, full width
-
-SLIDE 6 — STRATEGIC ROADMAP
-  - TYPE A background: "dark futuristic timeline path glowing blue nodes connected, 16:9"
-  - TYPE B chart: Horizontal Gantt-style chart using matplotlib barh with phase labels
-
-SLIDE 7 — RISK MATRIX
-  - Solid dark background (#0f172a)
-  - TYPE B chart: 2×2 quadrant scatter (Impact vs Likelihood), colored by severity, with risk labels
-
-SLIDE 8 — STAKEHOLDER PERSPECTIVES
-  - TYPE A background: "dark abstract network of connected people silhouettes blue glow 16:9"
-  - TYPE B chart: Spider/radar chart — each persona plotted as a polygon
-
-SLIDE 9 — FINAL VERDICT
-  - TYPE A background: "dark abstract dramatic light rays from above, navy blue, 16:9"
-  - 3 text boxes side by side: Aggressive (orange) / Balanced (blue) / Conservative (purple), each with colored border and icon
-
-SLIDE 10 — CALL TO ACTION
-  - TYPE A background: Generate a bold, inspiring image relevant to this specific business domain
-  - Large white centered text: "立即採取行動" with sub-points as next steps
-  - Contact/branding footer
+SLIDE 1 — COVER: TYPE A bg (dark space particles) + TYPE A hero (industry-matched illustration) + title/tagline/score overlay
+SLIDE 2 — EXECUTIVE SUMMARY: TYPE A bg (dark blue waves) + bullet points with ◆ + semi-transparent text card
+SLIDE 3 — MARKET OPPORTUNITY: TYPE A bg (night cityscape) + TYPE B horizontal bar chart + KPI numbers overlay
+SLIDE 4 — FINANCIAL PROJECTIONS: solid #0f172a + TYPE B grouped bar chart + TYPE C mini data table
+SLIDE 5 — COMPETITIVE LANDSCAPE: TYPE A bg (dark chess strategy) + TYPE C full-width styled table
+SLIDE 6 — STRATEGIC ROADMAP: TYPE A bg (glowing timeline nodes) + TYPE B Gantt chart
+SLIDE 7 — RISK MATRIX: solid #0f172a + TYPE B 2x2 scatter quadrant with labels
+SLIDE 8 — STAKEHOLDER PERSPECTIVES: TYPE A bg (network silhouettes) + TYPE B radar/spider chart
+SLIDE 9 — FINAL VERDICT: TYPE A bg (dramatic light rays) + 3-column text (Aggressive/Balanced/Conservative)
+SLIDE 10 — CALL TO ACTION: TYPE A hero image (industry-specific inspiring) + centered action text
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-IMPORTANT RULES:
+RULES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. The API key is read from environment variable: os.environ.get('GEMINI_API_KEY', '')
-2. For Imagen calls, wrap in try/except — if image generation fails, fall back to a matplotlib-generated gradient background
-3. All text on slides MUST be readable: always add a semi-transparent dark rectangle (RGBColor) behind text if placing over image
-4. Slide size: 13.33 x 7.5 inches (widescreen 16:9)
-5. Font sizes: Title=40-48pt, Subtitle=24-28pt, Body=16-20pt, Caption=12-14pt
-6. Save as: OmniView_投資提案.pptx
-7. At the end, print total slides generated and file path
+1. API key: os.environ.get('GEMINI_API_KEY', '')
+2. Always add semi-transparent dark rect behind text placed over images
+3. Slide size: 13.33 x 7.5 inches (widescreen 16:9)
+4. Font: Title=44pt, Subtitle=26pt, Body=18pt, Caption=13pt, all white
+5. Save as: OmniView_投資提案.pptx
+6. Print progress for each slide and final success message
 
-Here is the analysis data:
+Analysis data:
 \`\`\`json
 ${dataJson}
 \`\`\`
 
-Return ONLY the complete raw Python code. No markdown fences. No explanation. Start directly with import statements.
+Return ONLY raw Python code. No markdown fences. No explanation. Start with import statements.
 `;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro-preview-05-06',
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    config: { thinkingConfig: { thinkingBudget: 16000 } }
-  });
-
-  let code = response.text?.trim() || '';
-  // Strip any accidental markdown fences
-  code = code.replace(/^```python\n?/m, '').replace(/^```\n?/m, '').replace(/\n?```$/m, '');
-  return code;
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-pro-preview-05-06',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { thinkingConfig: { thinkingBudget: 16000 } },
+    });
+    let code = response.text?.trim() || '';
+    code = code.replace(/^```python\n?/m, '').replace(/^```\n?/m, '').replace(/\n?```$/m, '');
+    return code;
+  } catch (error) {
+    handleApiError(error);
+  }
 };
