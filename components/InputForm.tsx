@@ -97,7 +97,7 @@ const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
 
       <div className="tab-bar">
         <button onClick={() => setInputMethod('quick')} className={`tab-btn ${inputMethod === 'quick' ? 'active' : ''}`}>
-          <Sparkles size={16} /> AI 快速輸入（語音／文字）
+          <Sparkles size={16} /> AI 快速輸入
         </button>
         <button onClick={() => setInputMethod('manual')} className={`tab-btn ${inputMethod === 'manual' ? 'active' : ''}`}>
           <PenTool size={16} /> 詳細表單

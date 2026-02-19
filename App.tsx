@@ -114,7 +114,6 @@ const App: React.FC = () => {
               <span className="logo-text">OmniView AI</span>
             </div>
             <div className="header-right">
-              <span className="header-subtitle">Business Intelligence Agent v1.0</span>
               <button className="history-header-btn" onClick={() => setIsHistoryOpen(true)} title="歷史記錄">
                 <Clock size={18} />
                 {history.length > 0 && <span className="history-badge">{history.length}</span>}
