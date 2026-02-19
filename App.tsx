@@ -1,9 +1,21 @@
-import React, { useState } from 'react';
-import { AppState, AnalysisMode, BusinessInput, AnalysisResult } from './types';
+import React, { useState, useEffect } from 'react';
+import { AppState, AnalysisMode, BusinessInput, AnalysisResult, HistoryRecord } from './types';
 import InputForm from './components/InputForm';
 import AnalysisDashboard from './components/AnalysisDashboard';
+import HistoryPanel from './components/HistoryPanel';
 import { analyzeBusiness } from './services/geminiService';
-import { AlertCircle, Settings, Save, X } from 'lucide-react';
+import { AlertCircle, Settings, Save, X, Clock } from 'lucide-react';
+
+const HISTORY_KEY = 'omniview_history';
+const MAX_HISTORY = 20;
+
+const loadHistory = (): HistoryRecord[] => {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  catch { return []; }
+};
+const saveHistory = (records: HistoryRecord[]) => {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(records));
+};
 
 const ApiKeyModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const [key, setKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
@@ -31,27 +43,69 @@ const App: React.FC = () => {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryRecord[]>(loadHistory);
+  const [currentInput, setCurrentInput] = useState<BusinessInput | null>(null);
+
+  useEffect(() => { saveHistory(history); }, [history]);
 
   const handleAnalyze = async (mode: AnalysisMode, data: BusinessInput) => {
-    setAppState('ANALYZING'); setError(null);
+    setAppState('ANALYZING');
+    setError(null);
+    setCurrentInput(data);
     try {
       const analysisResult = await analyzeBusiness(mode, data);
-      setResult(analysisResult); setAppState('COMPLETE');
+      setResult(analysisResult);
+      setAppState('COMPLETE');
+
+      // 自動儲存到歷史記錄
+      const record: HistoryRecord = {
+        id: Date.now().toString(),
+        createdAt: Date.now(),
+        title: data.idea.slice(0, 40) || '未命名提案',
+        input: data,
+        result: analysisResult,
+      };
+      setHistory(prev => [record, ...prev].slice(0, MAX_HISTORY));
     } catch (err: any) {
       setError(err.message || '模擬過程中發生意外錯誤。');
       setAppState('ERROR');
     }
   };
 
-  const handleReset = () => { setResult(null); setError(null); setAppState('IDLE'); };
+  const handleLoadHistory = (record: HistoryRecord) => {
+    setResult(record.result);
+    setCurrentInput(record.input);
+    setAppState('COMPLETE');
+  };
+
+  const handleDeleteHistory = (id: string) => {
+    setHistory(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+  };
+
+  const handleReset = () => { setResult(null); setError(null); setCurrentInput(null); setAppState('IDLE'); };
 
   return (
     <div className="app-bg">
       <ApiKeyModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <HistoryPanel
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        records={history}
+        onLoad={handleLoadHistory}
+        onDelete={handleDeleteHistory}
+        onClearAll={handleClearHistory}
+      />
+
       <div className="bg-deco">
         <div className="bg-deco-top" />
         <div className="bg-deco-bottom" />
       </div>
+
       <div className="relative-z10">
         <header className="header">
           <div className="header-inner">
@@ -61,6 +115,10 @@ const App: React.FC = () => {
             </div>
             <div className="header-right">
               <span className="header-subtitle">Business Intelligence Agent v1.0</span>
+              <button className="history-header-btn" onClick={() => setIsHistoryOpen(true)} title="歷史記錄">
+                <Clock size={18} />
+                {history.length > 0 && <span className="history-badge">{history.length}</span>}
+              </button>
               <button className="settings-btn" onClick={() => setIsSettingsOpen(true)} title="設定 API Key">
                 <Settings size={20} />
               </button>
@@ -93,14 +151,14 @@ const App: React.FC = () => {
               <p className="error-msg" style={{ whiteSpace: 'pre-line' }}>{error}</p>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button className="error-retry-btn" onClick={handleReset}>重試</button>
-                <button className="error-retry-btn" style={{ background: '#1e40af' }} onClick={() => setIsSettingsOpen(true)}>
-                  設定 API Key
-                </button>
+                <button className="error-retry-btn" style={{ background: '#1e40af' }} onClick={() => setIsSettingsOpen(true)}>設定 API Key</button>
               </div>
             </div>
           )}
 
-          {appState === 'COMPLETE' && result && <AnalysisDashboard result={result} onReset={handleReset} />}
+          {appState === 'COMPLETE' && result && (
+            <AnalysisDashboard result={result} onReset={handleReset} />
+          )}
         </main>
 
         <footer>© {new Date().getFullYear()} OmniView AI. Powered by Google Gemini.</footer>

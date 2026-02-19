@@ -69,4 +69,12 @@ export interface AnalysisResult {
   };
 }
 
+export interface HistoryRecord {
+  id: string;
+  createdAt: number; // timestamp
+  title: string;     // 從 idea 欄位取前 40 字
+  input: BusinessInput;
+  result: AnalysisResult;
+}
+
 export type AppState = 'IDLE' | 'ANALYZING' | 'COMPLETE' | 'ERROR';
