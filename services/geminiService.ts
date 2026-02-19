@@ -126,8 +126,11 @@ const handleApiError = (error: any): never => {
       '⚠️ API 配額已用盡\n\n您的 Gemini API Key 已達到免費方案的用量上限。\n\n解決方式：\n• 等待配額重置（通常每分鐘或每天重置）\n• 前往 Google AI Studio 升級至付費方案\n• 使用不同的 API Key'
     );
   }
-  if (msg.includes('API_KEY_INVALID') || msg.includes('invalid') || msg.includes('401')) {
+  if (msg.includes('API_KEY_INVALID') || msg.includes('401')) {
     throw new Error('❌ API Key 無效\n\n請點擊右上角設定按鈕，重新輸入正確的 Gemini API Key。');
+  }
+  if (msg.includes('not found') || msg.includes('NOT_FOUND') || msg.includes('404')) {
+    throw new Error('❌ AI 模型暫時無法使用\n\n目前指定的 Gemini 模型不可用，可能是 Google 更新了模型版本。\n請稍後再試，或聯繫開發者更新模型設定。');
   }
   throw error;
 };
@@ -213,7 +216,7 @@ export const analyzeBusiness = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro-preview-05-06',
+      model: 'gemini-2.5-pro',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
@@ -300,7 +303,7 @@ Return ONLY raw Python code. No markdown fences. No explanation. Start with impo
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro-preview-05-06',
+      model: 'gemini-2.5-pro',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { thinkingConfig: { thinkingBudget: 16000 } },
     });

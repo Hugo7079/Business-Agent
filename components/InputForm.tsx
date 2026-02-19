@@ -91,7 +91,7 @@ const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
   return (
     <div className="form-wrapper">
       <div className="form-heading">
-        <h1 className="form-title">OmniView AI 商業提案評估</h1>
+        <h1 className="form-title">OmniView AI<br/>商業提案評估</h1>
         <p className="form-subtitle">您的 360° AI 董事會，提交任何商業想法，獲得全方位專業分析。</p>
       </div>
 
