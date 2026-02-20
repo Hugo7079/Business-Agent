@@ -89,8 +89,8 @@ const addBg = (slide: PptxGenJS.Slide, t: Theme) => {
   slide.addShape('rect', { x: 0, y: 0, w: '100%', h: 0.055, fill: { type: 'solid', color: t.accent } });
 };
 
-const addHeader = (slide: PptxGenJS.Slide, t: Theme, icon: string, title: string) => {
-  slide.addText(`${icon}  ${title}`, {
+const addHeader = (slide: PptxGenJS.Slide, t: Theme, title: string) => {
+  slide.addText(title, {
     x: 0.45, y: 0.12, w: 7.5, h: 0.52,
     fontSize: 20, bold: true, color: 'F8FAFC',
     fontFace: 'Arial',
@@ -143,11 +143,17 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     const slide = pptx.addSlide();
     slide.background = { fill: T.bg };
 
-    // 幾何裝飾（主題色調）
-    slide.addShape('rect', { x: 0, y: 0, w: '100%', h: 0.055, fill: { type: 'solid', color: T.accent } });
-    slide.addShape('ellipse', { x: 6.5, y: -1.2, w: 5.5, h: 5.5, fill: { type: 'solid', color: T.card } });
-    slide.addShape('ellipse', { x: -1.5, y: 4.5, w: 4, h: 4, fill: { type: 'solid', color: T.card } });
-    slide.addShape('ellipse', { x: 5.5, y: 4.5, w: 2.5, h: 2.5, fill: { type: 'solid', color: T.accent + '18' } });
+    // 如果有生成圖，作為背景圖層 (加上黑色半透明遮罩)
+    if (result.introImage) {
+      slide.addImage({ data: result.introImage, x: 0, y: 0, w: '100%', h: '100%', sizing: { type: 'cover', w: 10, h: 5.625 } });
+      slide.addShape('rect', { x: 0, y: 0, w: '100%', h: '100%', fill: { type: 'solid', color: '000000', transparency: 60 } });
+    } else {
+       // 無圖時的備用幾何裝飾
+       slide.addShape('rect', { x: 0, y: 0, w: '100%', h: 0.055, fill: { type: 'solid', color: T.accent } });
+       slide.addShape('ellipse', { x: 6.5, y: -1.2, w: 5.5, h: 5.5, fill: { type: 'solid', color: T.card } });
+       slide.addShape('ellipse', { x: -1.5, y: 4.5, w: 4, h: 4, fill: { type: 'solid', color: T.card } });
+       slide.addShape('ellipse', { x: 5.5, y: 4.5, w: 2.5, h: 2.5, fill: { type: 'solid', color: T.accent + '18' } });
+    }
 
     // OmniView badge
     slide.addShape('roundRect', { x: 0.5, y: 0.4, w: 0.6, h: 0.6, rectRadius: 0.1, fill: { type: 'solid', color: T.accent } });
@@ -179,8 +185,11 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     });
 
     // 底部
-    slide.addShape('rect', { x: 0, y: 7.15, w: '100%', h: 0.35, fill: { type: 'solid', color: T.card } });
-    slide.addText('由 OmniView AI 360° 虛擬董事會自動生成', { x: 0.5, y: 7.18, w: 6, h: 0.28, fontSize: 9, color: '475569' });
+    // slide.addShape('rect', { x: 0, y: 7.15, w: '100%', h: 0.35, fill: { type: 'solid', color: T.card } });
+    // 如果有圖片 底部改為半透明黑
+    slide.addShape('rect', { x: 0, y: 7.15, w: '100%', h: 0.35, fill: { type: 'solid', color: result.introImage ? '000000' : T.card, transparency: result.introImage ? 40 : 0 } });
+
+    slide.addText('由 OmniView AI 360° 虛擬董事會自動生成', { x: 0.5, y: 7.18, w: 6, h: 0.28, fontSize: 9, color: 'CBD5E1' });
     addPageNum(slide, 1, TOTAL, T);
   }
 
@@ -190,14 +199,15 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '📋', '執行摘要');
+    addHeader(slide, T, '執行摘要');
 
     // 左欄：摘要 bullets
     addCard(slide, T, 0.45, 0.85, 5.6, 5.6);
     slide.addText('核心觀點', { x: 0.7, y: 0.97, w: 5.1, h: 0.32, fontSize: 14, bold: true, color: T.accent });
     const bullets = toBullets(result.executiveSummary, 3, 45);
     const bulletRows = bullets.map(b => [
-      { text: '▸  ', options: { color: T.accent, bold: true, fontSize: 18 } },
+      // 移除 Emoji，改用純文字符號
+      { text: '•  ', options: { color: T.accent, bold: true, fontSize: 18 } },
       { text: b, options: { color: 'CBD5E1', fontSize: 16 } },
     ]);
     bulletRows.forEach((row, i) => {
@@ -227,7 +237,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '📈', '市場機會');
+    addHeader(slide, T, '市場機會');
 
     // 3 個 KPI 橫排
     const kpis = [
@@ -249,7 +259,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     const mBullets = toBullets(result.marketAnalysis.description, 3, 55);
     mBullets.forEach((b, i) => {
       slide.addText([
-        { text: '◆  ', options: { color: T.accent2, bold: true, fontSize: 16 } },
+        // 移除 Emoji
+        { text: '•  ', options: { color: T.accent2, bold: true, fontSize: 16 } },
         { text: b, options: { color: 'CBD5E1', fontSize: 16 } },
       ], { x: 0.72, y: 3.2 + i * 1.0, w: 8.5, h: 0.8, lineSpacingMultiple: 1.4, valign: 'top' });
     });
@@ -263,7 +274,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '💰', '財務預測');
+    addHeader(slide, T, '財務預測');
 
     // 表格
     const fHeader: PptxGenJS.TableCell[] = ['年度', '營收', '成本', '淨利'].map(t => ({
@@ -319,13 +330,14 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '⚔️', '競爭態勢分析');
+    addHeader(slide, T, '競爭態勢分析');
 
     const comps = result.competitors.slice(0, 3);
     const cHeader: PptxGenJS.TableCell[] = [
+      // 移除 Emoji
       { text: '競爭對手', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
-      { text: '✅ 優勢', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
-      { text: '❌ 劣勢', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
+      { text: '優勢 (Pros)', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
+      { text: '劣勢 (Cons)', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
     ];
     const cRows: PptxGenJS.TableCell[][] = [cHeader];
     comps.forEach((c, i) => {
@@ -354,7 +366,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '🗺️', '策略路線圖');
+    addHeader(slide, T, '策略路線圖');
 
     const items = result.roadmap.slice(0, 3);
     const totalH = 6.2;
@@ -401,7 +413,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '🛡️', '風險評估');
+    addHeader(slide, T, '風險評估');
 
     const risks = result.risks.slice(0, 3);
     const cardW = 2.85;
@@ -444,7 +456,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '👥', 'AI 虛擬董事會');
+    addHeader(slide, T, 'AI 虛擬董事會');
 
     const personas = result.personaEvaluations.slice(0, 3);
     const cardW = 2.85;
@@ -480,7 +492,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
 
       // 擔憂
       slide.addText([
-        { text: '⚠ 核心擔憂\n', options: { fontSize: 12, color: 'FBBF24', bold: true } },
+        // 移除 Emoji
+        { text: '核心擔憂\n', options: { fontSize: 12, color: 'FBBF24', bold: true } },
         { text: trunc(p.concern, 40), options: { fontSize: 13, color: 'CBD5E1' } },
       ], { x: x + 0.2, y: y + 2.8, w: cardW - 0.4, h: cardH - 3.0, lineSpacingMultiple: 1.5, valign: 'top' });
     });
@@ -494,12 +507,13 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   {
     const slide = pptx.addSlide();
     addBg(slide, T);
-    addHeader(slide, T, '⚖️', '最終裁決');
+    addHeader(slide, T, '最終裁決');
 
     const verdicts = [
-      { emoji: '🔥', title: '激進觀點', text: result.finalVerdicts.aggressive, color: 'F97316' },
-      { emoji: '⚖️', title: '平衡觀點', text: result.finalVerdicts.balanced, color: T.accent },
-      { emoji: '🛡️', title: '保守觀點', text: result.finalVerdicts.conservative, color: T.accent3 },
+      // 移除 Emoji
+      { title: '激進觀點 (Aggressive)', text: result.finalVerdicts.aggressive, color: 'F97316' },
+      { title: '平衡觀點 (Balanced)', text: result.finalVerdicts.balanced, color: T.accent },
+      { title: '保守觀點 (Conservative)', text: result.finalVerdicts.conservative, color: T.accent3 },
     ];
     const vCardW = 2.85;
     const vCardH = 5.2;
@@ -512,13 +526,13 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       // 頂色條
       slide.addShape('rect', { x, y, w: vCardW, h: 0.06, fill: { type: 'solid', color: v.color } });
       // Header
-      slide.addText(`${v.emoji}  ${v.title}`, { x: x + 0.2, y: y + 0.2, w: vCardW - 0.4, h: 0.5, fontSize: 16, bold: true, color: v.color });
+      slide.addText(v.title, { x: x + 0.2, y: y + 0.2, w: vCardW - 0.4, h: 0.5, fontSize: 16, bold: true, color: v.color });
       slide.addShape('rect', { x: x + 0.2, y: y + 0.8, w: 0.8, h: 0.03, fill: { type: 'solid', color: v.color } });
       // Content bullets
       const vBullets = toBullets(v.text, 3, 35);
       vBullets.forEach((b, bi) => {
         slide.addText([
-          { text: '▸ ', options: { color: v.color, bold: true, fontSize: 16 } },
+          { text: '• ', options: { color: v.color, bold: true, fontSize: 16 } },
           { text: b, options: { color: 'CBD5E1', fontSize: 14 } },
         ], { x: x + 0.2, y: y + 1.1 + bi * 1.2, w: vCardW - 0.4, h: 1.1, lineSpacingMultiple: 1.5, valign: 'top' });
       });

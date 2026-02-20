@@ -67,6 +67,7 @@ export interface AnalysisResult {
     balanced: string;
     conservative: string;
   };
+  introImage?: string; // Base64 image
 }
 
 export interface HistoryRecord {

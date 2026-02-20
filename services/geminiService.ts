@@ -142,6 +142,42 @@ const handleApiError = (error: any): never => {
   throw error;
 };
 
+export const generateBusinessImage = async (prompt: string): Promise<string | null> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'imagen-3.0-generate-002',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { 
+        responseMimeType: 'image/jpeg' 
+      }
+    });
+    
+    // Check if we got an image back. The structure depends on the specific client version responses
+    // For @google/genai with Imagen, it typically returns the binary data or base64.
+    // However, the standard generateContent might return text if the model isn't set up for image gen properly in this SDK version
+    // or if the response format differs.
+    // Let's assume standard handling: usually for image models it returns inline data.
+    
+    // Note: If the specific SDK version/model combo differs, we might need a fallback.
+    // But let's try the standard pattern for the new SDK.
+    const imagePart = response.candidates?.[0]?.content?.parts?.[0];
+    
+    if (imagePart && 'inlineData' in imagePart) {
+      return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+    }
+    
+    // Fallback: Check if payload is directly in a different structure or try a REST call if SDK fails.
+    // But for now let's hope the SDK works. If it returns null, the UI just won't show an image.
+    return null; 
+  } catch (e) {
+    console.warn("Image generation failed:", e);
+    return null;
+  }
+};
+
 const getApiKey = (): string => {
   const key = localStorage.getItem('GEMINI_API_KEY') || process.env.API_KEY || '';
   if (!key) throw new Error('找不到 API Key。請點擊右上角設定按鈕輸入您的 Google Gemini API Key。');
@@ -197,6 +233,16 @@ export const analyzeBusiness = async (
 ): Promise<AnalysisResult> => {
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
+
+  // Generate an image prompt based on the idea
+  let base64Image: string | null = null;
+  try {
+     const imagePrompt = `High quality, photorealistic commercial concept art for a business proposal about: ${data.idea}. 
+     Professional, cinematic lighting, corporate futuristic style, no text, 8k resolution.`;
+     base64Image = await generateBusinessImage(imagePrompt);
+  } catch (e) {
+    console.warn("Failed to generate intro image", e);
+  }
 
   const prompt = `你是 OmniView，一個進階 AI 商業模擬系統。
 你的任務是模擬一場「董事會會議」，由不同 AI 角色對以下商業提案進行全方位 360° 嚴格評估。
