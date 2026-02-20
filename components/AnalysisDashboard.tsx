@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AnalysisResult, PersonaEvaluation, FinancialYear, RoadmapItem } from '../types';
 import { TrendingUp, Users, ShieldAlert, Target, DollarSign, BarChart3, AlertTriangle, Briefcase, User, Factory, Sword, FileDown, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { generatePptNotebook } from '../services/geminiService';
+import { generatePptx } from '../services/pptxService';
 
 interface Props { result: AnalysisResult; onReset: () => void; mode?: string; }
 
@@ -21,43 +21,7 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
     setIsGeneratingPpt(true);
     setPptError(null);
     try {
-      const pythonCode = await generatePptNotebook(result);
-
-      // Build a .ipynb notebook with 2 cells: install deps + the generated code
-      const notebook = {
-        nbformat: 4,
-        nbformat_minor: 5,
-        metadata: { kernelspec: { display_name: 'Python 3', language: 'python', name: 'python3' }, language_info: { name: 'python', version: '3.10.0' } },
-        cells: [
-          {
-            cell_type: 'markdown',
-            metadata: {},
-            source: ['# OmniView AI — 投資提案 PPT 產生器\n', '執行下方程式碼即可在同目錄產生 `OmniView_投資提案.pptx`']
-          },
-          {
-            cell_type: 'code',
-            metadata: {},
-            execution_count: null,
-            outputs: [],
-            source: ['# 安裝必要套件（第一次執行時需要）\n', 'import subprocess, sys\n', 'subprocess.check_call([sys.executable, "-m", "pip", "install", "python-pptx", "matplotlib", "-q"])']
-          },
-          {
-            cell_type: 'code',
-            metadata: {},
-            execution_count: null,
-            outputs: [],
-            source: pythonCode.split('\n').map((line, i, arr) => i < arr.length - 1 ? line + '\n' : line)
-          }
-        ]
-      };
-
-      const blob = new Blob([JSON.stringify(notebook, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'OmniView_PPT產生器.ipynb';
-      a.click();
-      URL.revokeObjectURL(url);
+      await generatePptx(result);
     } catch (err: any) {
       setPptError(err.message || '產生失敗，請重試');
     } finally {
@@ -101,7 +65,7 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
         <div className="ppt-progress-bar">
           <div className="ppt-progress-inner">
             <Loader2 size={18} className="spin-icon" />
-            <span>AI 正在根據分析結果撰寫完整的 Python 簡報程式碼，請稍候（約 30-60 秒）...</span>
+            <span>正在產生 PowerPoint 簡報，請稍候...</span>
           </div>
         </div>
       )}
@@ -232,9 +196,9 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
         <div className="ppt-cta-left">
           <FileDown size={28} style={{color:'#3b82f6'}} />
           <div>
-            <div className="ppt-cta-title">下載 AI 投資人簡報</div>
+            <div className="ppt-cta-title">下載投資人簡報</div>
             <div className="ppt-cta-sub">
-              AI 將為每張投影片生成專屬背景圖與插圖（使用 Imagen 3），並結合 matplotlib 數據圖表與格式化表格，產出完整 10 頁的高質感簡報。下載 .ipynb 後在 Jupyter 執行即可。
+              一鍵產生完整 10 頁深色風格 PowerPoint 簡報，包含封面、執行摘要、市場分析、財務預測、競爭態勢、路線圖、風險評估、董事會評分與最終裁決。直接下載 .pptx，無需額外工具。
             </div>
           </div>
         </div>
@@ -244,8 +208,8 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
           disabled={isGeneratingPpt}
         >
           {isGeneratingPpt
-            ? <><Loader2 size={18} className="spin-icon" /> AI 撰寫中...</>
-            : <><FileDown size={18} /> 產生並下載 .ipynb</>}
+            ? <><Loader2 size={18} className="spin-icon" /> 產生中...</>
+            : <><FileDown size={18} /> 下載 .pptx 簡報</>}
         </button>
       </div>
     </div>
