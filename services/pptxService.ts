@@ -6,7 +6,7 @@ const trunc = (s: string, max: number) =>
   s && s.length > max ? s.slice(0, max - 1) + '…' : (s || '—');
 
 /** 把長段落切成精簡 bullet，每條最多 maxLen 字，最多 maxLines 條 */
-const toBullets = (text: string, maxLines = 4, maxLen = 52): string[] => {
+const toBullets = (text: string, maxLines = 3, maxLen = 40): string[] => {
   const sentences = text
     .replace(/([。！？\.!?])/g, '$1|')
     .split('|')
@@ -194,28 +194,28 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
 
     // 左欄：摘要 bullets
     addCard(slide, T, 0.45, 0.85, 5.6, 5.6);
-    slide.addText('核心觀點', { x: 0.7, y: 0.97, w: 5.1, h: 0.32, fontSize: 11, bold: true, color: T.accent });
-    const bullets = toBullets(result.executiveSummary, 5, 55);
+    slide.addText('核心觀點', { x: 0.7, y: 0.97, w: 5.1, h: 0.32, fontSize: 14, bold: true, color: T.accent });
+    const bullets = toBullets(result.executiveSummary, 3, 45);
     const bulletRows = bullets.map(b => [
-      { text: '▸  ', options: { color: T.accent, bold: true, fontSize: 12 } },
-      { text: b, options: { color: 'CBD5E1', fontSize: 12 } },
+      { text: '▸  ', options: { color: T.accent, bold: true, fontSize: 18 } },
+      { text: b, options: { color: 'CBD5E1', fontSize: 16 } },
     ]);
     bulletRows.forEach((row, i) => {
-      slide.addText(row, { x: 0.7, y: 1.38 + i * 0.85, w: 5.1, h: 0.75, lineSpacingMultiple: 1.45, valign: 'middle' });
+      slide.addText(row, { x: 0.7, y: 1.6 + i * 1.3, w: 5.1, h: 1.0, lineSpacingMultiple: 1.4, valign: 'top' });
     });
 
     // 右欄：關鍵指標
     const kpis = [
-      { label: '市場規模 (TAM)', val: trunc(result.marketAnalysis.size, 22), color: T.accent },
-      { label: '成長率 (CAGR)', val: trunc(result.marketAnalysis.growthRate, 22), color: T.accent2 },
-      { label: '損益平衡', val: trunc(result.breakEvenPoint, 22), color: T.accent3 },
+      { label: '市場規模 (TAM)', val: trunc(result.marketAnalysis.size, 18), color: T.accent },
+      { label: '成長率 (CAGR)', val: trunc(result.marketAnalysis.growthRate, 18), color: T.accent2 },
+      { label: '損益平衡', val: trunc(result.breakEvenPoint, 18), color: T.accent3 },
     ];
     kpis.forEach((kpi, i) => {
       const y = 0.85 + i * 1.85;
       addCard(slide, T, 6.25, y, 3.15, 1.65, kpi.color + '55');
       slide.addShape('rect', { x: 6.25, y, w: 0.04, h: 1.65, fill: { type: 'solid', color: kpi.color } });
-      slide.addText(kpi.label, { x: 6.45, y: y + 0.18, w: 2.8, h: 0.3, fontSize: 10, color: '94A3B8' });
-      slide.addText(kpi.val, { x: 6.45, y: y + 0.55, w: 2.8, h: 0.75, fontSize: 17, bold: true, color: kpi.color, lineSpacingMultiple: 1.2 });
+      slide.addText(kpi.label, { x: 6.45, y: y + 0.25, w: 2.8, h: 0.3, fontSize: 12, color: '94A3B8' });
+      slide.addText(kpi.val, { x: 6.45, y: y + 0.65, w: 2.8, h: 0.8, fontSize: 20, bold: true, color: kpi.color, lineSpacingMultiple: 1.2, valign: 'top' });
     });
 
     addPageNum(slide, 2, TOTAL, T);
@@ -239,19 +239,19 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       const x = 0.45 + i * 3.18;
       addCard(slide, T, x, 0.85, 2.95, 1.4, k.color + '66');
       slide.addShape('rect', { x, y: 0.85, w: 2.95, h: 0.04, fill: { type: 'solid', color: k.color } });
-      slide.addText(k.label, { x: x + 0.18, y: 0.97, w: 2.6, h: 0.3, fontSize: 10, color: '94A3B8' });
-      slide.addText(trunc(k.val, 24), { x: x + 0.18, y: 1.32, w: 2.6, h: 0.7, fontSize: 19, bold: true, color: k.color, lineSpacingMultiple: 1.1 });
+      slide.addText(k.label, { x: x + 0.18, y: 1.05, w: 2.6, h: 0.3, fontSize: 12, color: '94A3B8' });
+      slide.addText(trunc(k.val, 18), { x: x + 0.18, y: 1.45, w: 2.6, h: 0.7, fontSize: 22, bold: true, color: k.color, lineSpacingMultiple: 1.1, valign: 'top' });
     });
 
     // 市場描述 bullets
     addCard(slide, T, 0.45, 2.45, 9.05, 4.0);
-    slide.addText('市場洞察', { x: 0.72, y: 2.58, w: 8.5, h: 0.32, fontSize: 11, bold: true, color: T.accent });
-    const mBullets = toBullets(result.marketAnalysis.description, 5, 70);
+    slide.addText('市場洞察', { x: 0.72, y: 2.65, w: 8.5, h: 0.32, fontSize: 14, bold: true, color: T.accent });
+    const mBullets = toBullets(result.marketAnalysis.description, 3, 55);
     mBullets.forEach((b, i) => {
       slide.addText([
-        { text: '◆  ', options: { color: T.accent2, bold: true, fontSize: 11 } },
-        { text: b, options: { color: 'CBD5E1', fontSize: 12 } },
-      ], { x: 0.72, y: 3.05 + i * 0.65, w: 8.5, h: 0.58, valign: 'middle' });
+        { text: '◆  ', options: { color: T.accent2, bold: true, fontSize: 16 } },
+        { text: b, options: { color: 'CBD5E1', fontSize: 16 } },
+      ], { x: 0.72, y: 3.2 + i * 1.0, w: 8.5, h: 0.8, lineSpacingMultiple: 1.4, valign: 'top' });
     });
 
     addPageNum(slide, 3, TOTAL, T);
@@ -321,28 +321,28 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addBg(slide, T);
     addHeader(slide, T, '⚔️', '競爭態勢分析');
 
-    const comps = result.competitors.slice(0, 5);
+    const comps = result.competitors.slice(0, 3);
     const cHeader: PptxGenJS.TableCell[] = [
-      { text: '競爭對手', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 12, align: 'center' as const } },
-      { text: '✅ 優勢', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 12, align: 'center' as const } },
-      { text: '❌ 劣勢', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 12, align: 'center' as const } },
+      { text: '競爭對手', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
+      { text: '✅ 優勢', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
+      { text: '❌ 劣勢', options: { bold: true, color: 'FFFFFF', fill: { color: T.headerBg }, fontSize: 14, align: 'center' as const } },
     ];
     const cRows: PptxGenJS.TableCell[][] = [cHeader];
     comps.forEach((c, i) => {
       const bg = i % 2 === 0 ? T.card : T.bg;
       cRows.push([
-        { text: trunc(c.name, 20), options: { bold: true, color: 'F8FAFC', fill: { color: bg }, fontSize: 11, align: 'center' as const } },
-        { text: trunc(c.strength, 45), options: { color: T.accent2, fill: { color: bg }, fontSize: 10 } },
-        { text: trunc(c.weakness, 45), options: { color: 'F87171', fill: { color: bg }, fontSize: 10 } },
+        { text: trunc(c.name, 15), options: { bold: true, color: 'F8FAFC', fill: { color: bg }, fontSize: 14, align: 'center' as const, valign: 'middle' as const } },
+        { text: trunc(c.strength, 30), options: { color: T.accent2, fill: { color: bg }, fontSize: 13, valign: 'middle' as const, lineSpacingMultiple: 1.4 } },
+        { text: trunc(c.weakness, 30), options: { color: 'F87171', fill: { color: bg }, fontSize: 13, valign: 'middle' as const, lineSpacingMultiple: 1.4 } },
       ]);
     });
 
-    const rowH = Math.min(0.75, (6.4 / (comps.length + 1)));
+    const rowH = Math.min(1.6, (6.4 / (comps.length + 1)));
     slide.addTable(cRows, {
       x: 0.45, y: 0.88, w: 9.05,
       border: { type: 'solid', color: T.divider, pt: 0.5 },
       colW: [2.2, 3.42, 3.43],
-      rowH: [0.42, ...comps.map(() => rowH)],
+      rowH: [0.5, ...comps.map(() => rowH)],
     });
 
     addPageNum(slide, 5, TOTAL, T);
@@ -356,7 +356,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addBg(slide, T);
     addHeader(slide, T, '🗺️', '策略路線圖');
 
-    const items = result.roadmap.slice(0, 4);
+    const items = result.roadmap.slice(0, 3);
     const totalH = 6.2;
     const itemH = totalH / items.length;
 
@@ -370,26 +370,26 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       // 節點圓
       slide.addShape('ellipse', { x: 0.54, y: y + 0.14, w: 0.28, h: 0.28, fill: { type: 'solid', color: T.accent } });
       // 序號
-      slide.addText(`${i + 1}`, { x: 0.54, y: y + 0.14, w: 0.28, h: 0.28, fontSize: 9, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
+      slide.addText(`${i + 1}`, { x: 0.54, y: y + 0.14, w: 0.28, h: 0.28, fontSize: 10, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
 
       // Phase + timeframe
-      slide.addText(`${trunc(item.phase, 18)}`, { x: 1.0, y, w: 3.5, h: 0.35, fontSize: 13, bold: true, color: T.accent });
+      slide.addText(`${trunc(item.phase, 15)}`, { x: 1.0, y, w: 3.5, h: 0.35, fontSize: 15, bold: true, color: T.accent });
       slide.addShape('roundRect', { x: 4.7, y: y + 0.03, w: 1.5, h: 0.28, rectRadius: 0.14, fill: { type: 'solid', color: T.accent + '25' }, line: { color: T.accent + '60', width: 0.5 } });
-      slide.addText(trunc(item.timeframe, 14), { x: 4.7, y: y + 0.03, w: 1.5, h: 0.28, fontSize: 9, color: T.accent, align: 'center', valign: 'middle' });
+      slide.addText(trunc(item.timeframe, 12), { x: 4.7, y: y + 0.03, w: 1.5, h: 0.28, fontSize: 10, color: T.accent, align: 'center', valign: 'middle' });
 
       // 內容卡
-      const cardH = itemH - 0.45;
-      addCard(slide, T, 1.0, y + 0.4, 8.45, cardH - 0.08);
+      const cardH = itemH - 0.35;
+      addCard(slide, T, 1.0, y + 0.35, 8.45, cardH - 0.05);
 
       const halfW = 4.0;
       // 產品
-      slide.addText('產品', { x: 1.18, y: y + 0.5, w: 0.7, h: 0.24, fontSize: 9, bold: true, color: T.accent2 });
-      slide.addText(trunc(item.product, 48), { x: 1.18, y: y + 0.73, w: halfW - 0.3, h: cardH - 0.45, fontSize: 10, color: 'CBD5E1', lineSpacingMultiple: 1.3, valign: 'top' });
+      slide.addText('產品', { x: 1.18, y: y + 0.45, w: 0.7, h: 0.24, fontSize: 12, bold: true, color: T.accent2 });
+      slide.addText(trunc(item.product, 35), { x: 1.18, y: y + 0.75, w: halfW - 0.3, h: cardH - 0.45, fontSize: 13, color: 'CBD5E1', lineSpacingMultiple: 1.4, valign: 'top' });
       // 分隔
-      slide.addShape('rect', { x: 5.2, y: y + 0.5, w: 0.02, h: cardH - 0.2, fill: { type: 'solid', color: T.divider } });
+      slide.addShape('rect', { x: 5.2, y: y + 0.45, w: 0.02, h: cardH - 0.2, fill: { type: 'solid', color: T.divider } });
       // 技術
-      slide.addText('技術', { x: 5.35, y: y + 0.5, w: 0.7, h: 0.24, fontSize: 9, bold: true, color: T.accent3 });
-      slide.addText(trunc(item.technology, 48), { x: 5.35, y: y + 0.73, w: 3.8, h: cardH - 0.45, fontSize: 10, color: 'CBD5E1', lineSpacingMultiple: 1.3, valign: 'top' });
+      slide.addText('技術', { x: 5.35, y: y + 0.45, w: 0.7, h: 0.24, fontSize: 12, bold: true, color: T.accent3 });
+      slide.addText(trunc(item.technology, 35), { x: 5.35, y: y + 0.75, w: 3.8, h: cardH - 0.45, fontSize: 13, color: 'CBD5E1', lineSpacingMultiple: 1.4, valign: 'top' });
     });
 
     addPageNum(slide, 6, TOTAL, T);
@@ -403,33 +403,36 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addBg(slide, T);
     addHeader(slide, T, '🛡️', '風險評估');
 
-    const risks = result.risks.slice(0, 6);
-    const cols = 2;
-    const rows = Math.ceil(risks.length / cols);
-    const cardW = 4.42;
-    const cardH = (6.25 - 0.1 * (rows - 1)) / rows;
+    const risks = result.risks.slice(0, 3);
+    const cardW = 2.85;
+    const cardH = 5.2;
+    const gap = 0.25;
 
     risks.forEach((r, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const x = 0.45 + col * (cardW + 0.21);
-      const y = 0.88 + row * (cardH + 0.1);
+      const x = 0.45 + i * (cardW + gap);
+      const y = 1.0;
       const ic = r.impact === 'High' ? 'EF4444' : r.impact === 'Medium' ? 'FBBF24' : '10B981';
       const label = r.impact === 'High' ? '高' : r.impact === 'Medium' ? '中' : '低';
 
       addCard(slide, T, x, y, cardW, cardH, ic + '55');
-      // 左側色條
-      slide.addShape('rect', { x, y, w: 0.04, h: cardH, fill: { type: 'solid', color: ic } });
+      // 頂部色條
+      slide.addShape('rect', { x, y, w: cardW, h: 0.06, fill: { type: 'solid', color: ic } });
+      
       // 衝擊標籤
-      slide.addShape('roundRect', { x: x + cardW - 0.95, y: y + 0.1, w: 0.82, h: 0.28, rectRadius: 0.14, fill: { type: 'solid', color: ic + '30' }, line: { color: ic, width: 0.5 } });
-      slide.addText(label, { x: x + cardW - 0.95, y: y + 0.1, w: 0.82, h: 0.28, fontSize: 9, bold: true, color: ic, align: 'center', valign: 'middle' });
+      slide.addShape('roundRect', { x: x + 0.2, y: y + 0.25, w: 0.82, h: 0.35, rectRadius: 0.17, fill: { type: 'solid', color: ic + '30' }, line: { color: ic, width: 0.5 } });
+      slide.addText(label, { x: x + 0.2, y: y + 0.25, w: 0.82, h: 0.35, fontSize: 11, bold: true, color: ic, align: 'center', valign: 'middle' });
+      
       // 風險標題
-      slide.addText(trunc(r.risk, 32), { x: x + 0.18, y: y + 0.1, w: cardW - 1.2, h: 0.32, fontSize: 11, bold: true, color: 'F8FAFC' });
+      slide.addText(trunc(r.risk, 25), { x: x + 0.2, y: y + 0.8, w: cardW - 0.4, h: 0.8, fontSize: 16, bold: true, color: 'F8FAFC', valign: 'top', lineSpacingMultiple: 1.3 });
+      
+      // 分隔線
+      slide.addShape('rect', { x: x + 0.2, y: y + 1.7, w: cardW - 0.4, h: 0.02, fill: { type: 'solid', color: T.divider } });
+
       // 因應策略
       slide.addText([
-        { text: '因應：', options: { fontSize: 9, color: '64748B', bold: true } },
-        { text: trunc(r.mitigation, 55), options: { fontSize: 9, color: 'CBD5E1' } },
-      ], { x: x + 0.18, y: y + 0.48, w: cardW - 0.28, h: cardH - 0.62, lineSpacingMultiple: 1.4, valign: 'top' });
+        { text: '因應策略\n', options: { fontSize: 12, color: '64748B', bold: true } },
+        { text: trunc(r.mitigation, 45), options: { fontSize: 13, color: 'CBD5E1' } },
+      ], { x: x + 0.2, y: y + 1.9, w: cardW - 0.4, h: cardH - 2.1, lineSpacingMultiple: 1.5, valign: 'top' });
     });
 
     addPageNum(slide, 7, TOTAL, T);
@@ -443,45 +446,43 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addBg(slide, T);
     addHeader(slide, T, '👥', 'AI 虛擬董事會');
 
-    const personas = result.personaEvaluations.slice(0, 5);
-    const cols = Math.min(personas.length, 3);
-    const rows = Math.ceil(personas.length / cols);
-    const gap = 0.15;
-    const cardW = (9.05 - gap * (cols - 1)) / cols;
-    const cardH = (6.25 - gap * (rows - 1)) / rows;
+    const personas = result.personaEvaluations.slice(0, 3);
+    const cardW = 2.85;
+    const cardH = 5.2;
+    const gap = 0.25;
 
     personas.forEach((p, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const x = 0.45 + col * (cardW + gap);
-      const y = 0.88 + row * (cardH + gap);
+      const x = 0.45 + i * (cardW + gap);
+      const y = 1.0;
       const sc = Number(p.score) || 0;
       const sC = scoreColor(sc);
 
       addCard(slide, T, x, y, cardW, cardH);
-      slide.addShape('rect', { x, y, w: cardW, h: 0.04, fill: { type: 'solid', color: sC } });
+      slide.addShape('rect', { x, y, w: cardW, h: 0.06, fill: { type: 'solid', color: sC } });
 
       // 角色名 + 分數
-      slide.addText(trunc(p.role, 16), { x: x + 0.15, y: y + 0.12, w: cardW - 1.1, h: 0.32, fontSize: 12, bold: true, color: 'F8FAFC' });
-      slide.addText(`${sc}`, { x: x + cardW - 0.95, y: y + 0.1, w: 0.8, h: 0.35, fontSize: 18, bold: true, color: sC, align: 'right' });
+      slide.addText(trunc(p.role, 15), { x: x + 0.2, y: y + 0.2, w: cardW - 1.2, h: 0.4, fontSize: 15, bold: true, color: 'F8FAFC' });
+      slide.addText(`${sc}`, { x: x + cardW - 1.0, y: y + 0.2, w: 0.8, h: 0.4, fontSize: 24, bold: true, color: sC, align: 'right' });
 
       // 分數條
-      const barW = (cardW - 0.3) * (sc / 100);
-      slide.addShape('roundRect', { x: x + 0.15, y: y + 0.5, w: cardW - 0.3, h: 0.06, rectRadius: 0.03, fill: { type: 'solid', color: T.divider } });
-      slide.addShape('roundRect', { x: x + 0.15, y: y + 0.5, w: Math.max(barW, 0.05), h: 0.06, rectRadius: 0.03, fill: { type: 'solid', color: sC } });
+      const barW = (cardW - 0.4) * (sc / 100);
+      slide.addShape('roundRect', { x: x + 0.2, y: y + 0.7, w: cardW - 0.4, h: 0.08, rectRadius: 0.04, fill: { type: 'solid', color: T.divider } });
+      slide.addShape('roundRect', { x: x + 0.2, y: y + 0.7, w: Math.max(barW, 0.05), h: 0.08, rectRadius: 0.04, fill: { type: 'solid', color: sC } });
 
       // 引言
-      slide.addText(`"${trunc(p.keyQuote, 38)}"`, {
-        x: x + 0.15, y: y + 0.65, w: cardW - 0.3, h: rows === 1 ? 0.9 : 0.65,
-        fontSize: 9.5, italic: true, color: '94A3B8', lineSpacingMultiple: 1.35, valign: 'top',
+      slide.addText(`"${trunc(p.keyQuote, 35)}"`, {
+        x: x + 0.2, y: y + 1.0, w: cardW - 0.4, h: 1.5,
+        fontSize: 13, italic: true, color: '94A3B8', lineSpacingMultiple: 1.5, valign: 'top',
       });
 
+      // 分隔線
+      slide.addShape('rect', { x: x + 0.2, y: y + 2.6, w: cardW - 0.4, h: 0.02, fill: { type: 'solid', color: T.divider } });
+
       // 擔憂
-      const concernY = y + (rows === 1 ? 1.65 : 1.38);
       slide.addText([
-        { text: '⚠ ', options: { fontSize: 9, color: 'FBBF24' } },
-        { text: trunc(p.concern, 55), options: { fontSize: 9, color: 'CBD5E1' } },
-      ], { x: x + 0.15, y: concernY, w: cardW - 0.3, h: cardH - (concernY - y) - 0.1, lineSpacingMultiple: 1.3, valign: 'top' });
+        { text: '⚠ 核心擔憂\n', options: { fontSize: 12, color: 'FBBF24', bold: true } },
+        { text: trunc(p.concern, 40), options: { fontSize: 13, color: 'CBD5E1' } },
+      ], { x: x + 0.2, y: y + 2.8, w: cardW - 0.4, h: cardH - 3.0, lineSpacingMultiple: 1.5, valign: 'top' });
     });
 
     addPageNum(slide, 8, TOTAL, T);
@@ -500,25 +501,26 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       { emoji: '⚖️', title: '平衡觀點', text: result.finalVerdicts.balanced, color: T.accent },
       { emoji: '🛡️', title: '保守觀點', text: result.finalVerdicts.conservative, color: T.accent3 },
     ];
-    const vCardW = 2.9;
-    const vCardH = 5.9;
-    const gap = 0.22;
+    const vCardW = 2.85;
+    const vCardH = 5.2;
+    const gap = 0.25;
 
     verdicts.forEach((v, i) => {
       const x = 0.45 + i * (vCardW + gap);
-      addCard(slide, T, x, 0.88, vCardW, vCardH, v.color + '55');
+      const y = 1.0;
+      addCard(slide, T, x, y, vCardW, vCardH, v.color + '55');
       // 頂色條
-      slide.addShape('rect', { x, y: 0.88, w: vCardW, h: 0.04, fill: { type: 'solid', color: v.color } });
+      slide.addShape('rect', { x, y, w: vCardW, h: 0.06, fill: { type: 'solid', color: v.color } });
       // Header
-      slide.addText(`${v.emoji}  ${v.title}`, { x: x + 0.18, y: 0.97, w: vCardW - 0.25, h: 0.38, fontSize: 13, bold: true, color: v.color });
-      slide.addShape('rect', { x: x + 0.18, y: 1.38, w: 0.8, h: 0.03, fill: { type: 'solid', color: v.color } });
+      slide.addText(`${v.emoji}  ${v.title}`, { x: x + 0.2, y: y + 0.2, w: vCardW - 0.4, h: 0.5, fontSize: 16, bold: true, color: v.color });
+      slide.addShape('rect', { x: x + 0.2, y: y + 0.8, w: 0.8, h: 0.03, fill: { type: 'solid', color: v.color } });
       // Content bullets
-      const vBullets = toBullets(v.text, 6, 38);
+      const vBullets = toBullets(v.text, 3, 35);
       vBullets.forEach((b, bi) => {
         slide.addText([
-          { text: '▸ ', options: { color: v.color, bold: true, fontSize: 10 } },
-          { text: b, options: { color: 'CBD5E1', fontSize: 10 } },
-        ], { x: x + 0.18, y: 1.55 + bi * 0.68, w: vCardW - 0.28, h: 0.62, lineSpacingMultiple: 1.3, valign: 'middle' });
+          { text: '▸ ', options: { color: v.color, bold: true, fontSize: 16 } },
+          { text: b, options: { color: 'CBD5E1', fontSize: 14 } },
+        ], { x: x + 0.2, y: y + 1.1 + bi * 1.2, w: vCardW - 0.4, h: 1.1, lineSpacingMultiple: 1.5, valign: 'top' });
       });
     });
 
