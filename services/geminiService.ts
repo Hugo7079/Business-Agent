@@ -4,7 +4,7 @@ import { AnalysisMode, BusinessInput, AnalysisResult, ParsedInputResponse } from
 const analysisSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    successProbability: { type: Type.NUMBER },
+    successProbability: { type: Type.NUMBER, description: '0到100之間的整數，例如 65 代表 65%，絕對不可以用小數如 0.65' },
     executiveSummary: { type: Type.STRING },
     marketAnalysis: {
       type: Type.OBJECT,
@@ -13,6 +13,7 @@ const analysisSchema: Schema = {
         growthRate: { type: Type.STRING },
         description: { type: Type.STRING },
       },
+      required: ['size', 'growthRate', 'description'],
     },
     competitors: {
       type: Type.ARRAY,
@@ -23,6 +24,7 @@ const analysisSchema: Schema = {
           strength: { type: Type.STRING },
           weakness: { type: Type.STRING },
         },
+        required: ['name', 'strength', 'weakness'],
       },
     },
     roadmap: {
@@ -35,6 +37,7 @@ const analysisSchema: Schema = {
           technology: { type: Type.STRING },
           product: { type: Type.STRING },
         },
+        required: ['phase', 'timeframe', 'technology', 'product'],
       },
     },
     financials: {
@@ -47,6 +50,7 @@ const analysisSchema: Schema = {
           profit: { type: Type.NUMBER },
           costs: { type: Type.NUMBER },
         },
+        required: ['year', 'revenue', 'profit', 'costs'],
       },
     },
     breakEvenPoint: { type: Type.STRING },
@@ -59,6 +63,7 @@ const analysisSchema: Schema = {
           impact: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
           mitigation: { type: Type.STRING },
         },
+        required: ['risk', 'impact', 'mitigation'],
       },
     },
     personaEvaluations: {
@@ -68,11 +73,12 @@ const analysisSchema: Schema = {
         properties: {
           role: { type: Type.STRING },
           icon: { type: Type.STRING },
-          perspective: { type: Type.STRING },
-          score: { type: Type.NUMBER },
-          keyQuote: { type: Type.STRING },
-          concern: { type: Type.STRING },
+          perspective: { type: Type.STRING, description: '此角色對提案的詳細看法，至少 50 字' },
+          score: { type: Type.NUMBER, description: '0到100之間的整數評分' },
+          keyQuote: { type: Type.STRING, description: '此角色最具代表性的一句話引言' },
+          concern: { type: Type.STRING, description: '此角色最主要的擔憂，必填，至少 20 字' },
         },
+        required: ['role', 'icon', 'perspective', 'score', 'keyQuote', 'concern'],
       },
     },
     teamAnalysis: { type: Type.STRING },
@@ -83,6 +89,7 @@ const analysisSchema: Schema = {
         balanced: { type: Type.STRING },
         conservative: { type: Type.STRING },
       },
+      required: ['aggressive', 'balanced', 'conservative'],
     },
   },
   required: [

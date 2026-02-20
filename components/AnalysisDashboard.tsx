@@ -17,6 +17,23 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
   const [isGeneratingPpt, setIsGeneratingPpt] = useState(false);
   const [pptError, setPptError] = useState<string | null>(null);
 
+  // 強制將 financials 每個欄位轉成純 number，防止 AI 回傳字串導致 Recharts 無法渲染
+  const chartData = (result.financials || []).map(f => ({
+    year: f.year ?? '',
+    revenue: Number(f.revenue) || 0,
+    costs: Number(f.costs) || 0,
+    profit: Number(f.profit) || 0,
+  }));
+
+  const hasFinancialData = chartData.length > 0 && chartData.some(f => f.revenue !== 0 || f.costs !== 0 || f.profit !== 0);
+
+  // 將大數字格式化為 K / M，讓 Y 軸刻度可讀
+  const formatYAxis = (value: number) => {
+    if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+    return String(value);
+  };
+
   const handleGeneratePpt = async () => {
     setIsGeneratingPpt(true);
     setPptError(null);
@@ -113,9 +130,9 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
         <div className="chart-card">
           <div className="chart-title"><BarChart3 size={20} style={{color:'#34d399'}} /> 財務預測</div>
           <div className="chart-wrap">
-            {result.financials && result.financials.length > 0 ? (
+            {hasFinancialData ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={result.financials}>
+                <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
@@ -128,7 +145,7 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                   <XAxis dataKey="year" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" tickFormatter={formatYAxis} />
                   <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }} />
                   <Legend />
                   <Area type="monotone" dataKey="revenue" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRev)" name="營收" />

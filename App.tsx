@@ -55,10 +55,41 @@ const App: React.FC = () => {
     setCurrentInput(data);
     try {
       const analysisResult = await analyzeBusiness(mode, data);
+
+      // 修正 successProbability：AI 有時回傳小數（0.32 代表 32%），有時回傳整數（32）
+      // 只要 < 1 就乘以 100；另外也 clamp 到 0-100 防止超出範圍
+      if (analysisResult.successProbability < 1) {
+        analysisResult.successProbability = Math.round(analysisResult.successProbability * 100);
+      }
+      analysisResult.successProbability = Math.min(100, Math.max(0, Math.round(analysisResult.successProbability)));
+
+      // 修正 financials：確保每筆資料的數字欄位都是有效數字
+      if (!Array.isArray(analysisResult.financials)) {
+        analysisResult.financials = [];
+      }
+      analysisResult.financials = analysisResult.financials.map(f => ({
+        year: f.year ?? '未知',
+        revenue: Number(f.revenue) || 0,
+        costs: Number(f.costs) || 0,
+        profit: Number(f.profit) || 0,
+      }));
+
+      // 修正 personaEvaluations：確保每個 persona 有完整欄位
+      if (!Array.isArray(analysisResult.personaEvaluations)) {
+        analysisResult.personaEvaluations = [];
+      }
+      analysisResult.personaEvaluations = analysisResult.personaEvaluations.map(p => ({
+        role: p.role ?? '未知角色',
+        icon: p.icon ?? 'default',
+        perspective: p.perspective ?? '',
+        score: Math.min(100, Math.max(0, Math.round(Number(p.score) || 0))),
+        keyQuote: p.keyQuote ?? '',
+        concern: p.concern ?? '',
+      }));
+
       setResult(analysisResult);
       setAppState('COMPLETE');
 
-      // 自動儲存到歷史記錄
       const record: HistoryRecord = {
         id: Date.now().toString(),
         createdAt: Date.now(),

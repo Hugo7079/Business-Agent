@@ -316,6 +316,11 @@ footer { padding: 2rem; text-align: center; color: #475569; font-size: 0.875rem;
 .chart-card { background: rgba(30,41,59,0.4); border: 1px solid #334155; border-radius: 16px; padding: 1.5rem; }
 .chart-title { font-size: 1.1rem; font-weight: 600; color: #fff; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; }
 .chart-wrap { height: 300px; width: 100%; }
+.empty-state {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  color: #475569; font-size: 0.875rem; text-align: center;
+  border: 1px dashed #334155; border-radius: 8px; padding: 1rem;
+}
 
 .roadmap-list { display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto; max-height: 320px; padding-right: 8px; }
 .roadmap-item { position: relative; padding-left: 1.5rem; border-left: 2px solid #334155; }

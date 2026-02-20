@@ -151,12 +151,15 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     const rows: PptxGenJS.TableCell[][] = [headerRow];
     result.financials.forEach((f, i) => {
       const bg = i % 2 === 0 ? CARD_BG : '162032';
-      const profitColor = f.profit >= 0 ? ACCENT_GREEN : ACCENT_RED;
+      const revenue = Number(f.revenue) || 0;
+      const costs = Number(f.costs) || 0;
+      const profit = Number(f.profit) || 0;
+      const profitColor = profit >= 0 ? ACCENT_GREEN : ACCENT_RED;
       rows.push([
-        { text: f.year, options: { color: TEXT_WHITE, fill: { color: bg }, fontSize: 12, align: 'center' } },
-        { text: `$${f.revenue.toLocaleString()}`, options: { color: ACCENT_BLUE, fill: { color: bg }, fontSize: 12, align: 'center', bold: true } },
-        { text: `$${f.costs.toLocaleString()}`, options: { color: TEXT_MUTED, fill: { color: bg }, fontSize: 12, align: 'center' } },
-        { text: `$${f.profit.toLocaleString()}`, options: { color: profitColor, fill: { color: bg }, fontSize: 12, align: 'center', bold: true } },
+        { text: f.year ?? '—', options: { color: TEXT_WHITE, fill: { color: bg }, fontSize: 12, align: 'center' } },
+        { text: `$${revenue.toLocaleString()}`, options: { color: ACCENT_BLUE, fill: { color: bg }, fontSize: 12, align: 'center', bold: true } },
+        { text: `$${costs.toLocaleString()}`, options: { color: TEXT_MUTED, fill: { color: bg }, fontSize: 12, align: 'center' } },
+        { text: `$${profit.toLocaleString()}`, options: { color: profitColor, fill: { color: bg }, fontSize: 12, align: 'center', bold: true } },
       ]);
     });
 
