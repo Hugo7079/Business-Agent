@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
-      base: process.env.VITE_BASE_PATH !== undefined ? process.env.VITE_BASE_PATH : './',
+      base: process.env.VITE_BASE_PATH !== undefined ? process.env.VITE_BASE_PATH : '/Business-Agent/',
       server: {
         port: 3000,
         host: '0.0.0.0',
