@@ -2,22 +2,125 @@ import PptxGenJS from 'pptxgenjs';
 import { AnalysisResult } from '../types';
 
 // ─── 文字工具 ────────────────────────────────────────────
-const trunc = (s: string, max: number) =>
-  s && s.length > max ? s.slice(0, max - 1) + '…' : (s || '—');
 
-/** 把長段落切成精簡 bullet，每條最多 maxLen 字，最多 maxLines 條 */
-const toBullets = (text: string, maxLines = 4, maxLen = 52): string[] => {
+/** 安全截斷，不會切在詞中間 */
+const trunc = (s: string, max: number): string => {
+  if (!s) return '—';
+  const cleaned = stripFiller(s);
+  if (cleaned.length <= max) return cleaned;
+  return cleaned.slice(0, max - 1) + '…';
+};
+
+/** 移除冗贅語句、連接詞、語助詞，保留核心意思 */
+const stripFiller = (s: string): string => {
+  return s
+    .replace(/^(此外|另外|同時|因此|然而|不過|總之|換言之|簡而言之|綜上所述|值得注意的是|需要注意的是|具體來說|一般來說)[，,、]/g, '')
+    .replace(/(的話|而言|方面|層面|角度|部分|情況|狀況)$/g, '')
+    .replace(/^\s*(我們認為|我們建議|建議|預計|預期|估計|根據分析|經過評估|整體而言)\s*/g, '')
+    .replace(/[。！？!?.]+$/g, '')
+    .trim();
+};
+
+/**
+ * 把長段落拆成精簡 bullet 小標
+ * - 先按句子拆分
+ * - 每句提取核心短語（去掉冗贅開頭/結尾）
+ * - 控制每條最多 maxLen 字
+ * - 最多 maxLines 條
+ */
+const toBullets = (text: string, maxLines = 4, maxLen = 40): string[] => {
+  if (!text) return ['—'];
+
+  // 先按各種句號分割
+  const raw = text
+    .replace(/([。！？\.!?；;])/g, '$1|')
+    .split('|')
+    .map(s => s.replace(/[。！？\.!?；;]+$/g, '').trim())
+    .filter(s => s.length > 2);
+
+  const bullets: string[] = [];
+  const seen = new Set<string>();
+
+  for (const sentence of raw) {
+    if (bullets.length >= maxLines) break;
+
+    // 把長句拆成更小的分句（用逗號、頓號）
+    const clauses = sentence
+      .split(/[，,、]/)
+      .map(c => stripFiller(c.trim()))
+      .filter(c => c.length > 2);
+
+    if (clauses.length === 0) continue;
+
+    let point: string;
+    if (sentence.length <= maxLen) {
+      // 短句直接用
+      point = stripFiller(sentence);
+    } else if (clauses.length >= 2) {
+      // 長句：取最有資訊量的子句組合
+      // 優先取含數字或關鍵詞的子句
+      const ranked = clauses.sort((a, b) => {
+        const scoreA = (/\d/.test(a) ? 3 : 0) + (a.length > 4 ? 1 : 0) + (/[%億萬美元]/.test(a) ? 2 : 0);
+        const scoreB = (/\d/.test(b) ? 3 : 0) + (b.length > 4 ? 1 : 0) + (/[%億萬美元]/.test(b) ? 2 : 0);
+        return scoreB - scoreA;
+      });
+      // 組合前幾個子句，不超過 maxLen
+      let combined = ranked[0];
+      for (let j = 1; j < ranked.length; j++) {
+        const next = combined + '、' + ranked[j];
+        if (next.length > maxLen) break;
+        combined = next;
+      }
+      point = combined;
+    } else {
+      point = trunc(clauses[0], maxLen);
+    }
+
+    // 去重（避免語意重複的 bullet）
+    const key = point.slice(0, 8);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    if (point.length > 1) bullets.push(point.length > maxLen ? trunc(point, maxLen) : point);
+  }
+
+  return bullets.length ? bullets : [trunc(text, maxLen)];
+};
+
+/**
+ * 把一段敘述濃縮成一個短標籤（用在 strength / weakness / concern / mitigation 等欄位）
+ * 目標：≤ maxLen 字，像簡報小標而非完整句
+ */
+const toTag = (text: string, maxLen = 25): string => {
+  if (!text) return '—';
+  const cleaned = stripFiller(text);
+  // 如果已經夠短，直接用
+  if (cleaned.length <= maxLen) return cleaned;
+  // 用逗號拆分，取第一段最核心的
+  const parts = cleaned.split(/[，,、]/).map(p => p.trim()).filter(p => p.length > 2);
+  if (parts.length === 0) return trunc(cleaned, maxLen);
+  // 優先取含關鍵詞（數字、百分比）的子句
+  const best = parts.sort((a, b) => {
+    const sa = (/\d/.test(a) ? 2 : 0) + (a.length > 4 ? 1 : 0);
+    const sb = (/\d/.test(b) ? 2 : 0) + (b.length > 4 ? 1 : 0);
+    return sb - sa;
+  })[0];
+  return trunc(best, maxLen);
+};
+
+/** 把長觀點文字壓成簡短引言（去頭去尾，取最有力的那句） */
+const toQuote = (text: string, maxLen = 30): string => {
+  if (!text) return '—';
   const sentences = text
     .replace(/([。！？\.!?])/g, '$1|')
     .split('|')
-    .map(s => s.trim())
-    .filter(s => s.length > 2);
-  const bullets: string[] = [];
-  for (const s of sentences) {
-    if (bullets.length >= maxLines) break;
-    bullets.push(trunc(s, maxLen));
-  }
-  return bullets.length ? bullets : [trunc(text, maxLen)];
+    .map(s => stripFiller(s.trim()))
+    .filter(s => s.length > 3);
+  if (sentences.length === 0) return trunc(text, maxLen);
+  // 取最短但有意義的那句（通常最精準）
+  const sorted = sentences.filter(s => s.length >= 6).sort((a, b) => a.length - b.length);
+  const pick = sorted[0] || sentences[0];
+  return trunc(pick, maxLen);
 };
 
 const fmt = (n: number) => {
@@ -178,8 +281,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     slide.addText('AI 評估成功機率', { x: 0.5, y: 3.95, w: 2.4, h: 0.28, fontSize: 9, color: sC, align: 'center' });
     slide.addText(`${sc}%`, { x: 0.5, y: 4.22, w: 2.4, h: 0.5, fontSize: 26, bold: true, color: sC, align: 'center', valign: 'middle' });
 
-    // 核心摘要（精簡版）
-    const summaryLine = trunc(result.executiveSummary, 85);
+    // 核心摘要（精簡版）— 用 toTag 抓重點而非截斷
+    const summaryLine = toTag(result.executiveSummary, 80);
     slide.addText(summaryLine, {
       x: 0.5, y: 5.1, w: 9.0, h: 0.6,
       fontSize: 12, color: '94A3B8', lineSpacingMultiple: 1.4, italic: true,
@@ -355,7 +458,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
 
     const comps = result.competitors.slice(0, 5);
     const headerRowH = 0.42;
-    const maxDataH = SAFE_B - SAFE_T - headerRowH; // = 5.95 - 0.42 = 5.53
+    const maxDataH = SAFE_B - SAFE_T - headerRowH;
     const rowH = Math.min(0.7, maxDataH / comps.length);
 
     const cHeader: PptxGenJS.TableCell[] = [
@@ -367,9 +470,9 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     comps.forEach((c, i) => {
       const bg = i % 2 === 0 ? T.card : T.bg;
       cRows.push([
-        { text: trunc(c.name, 18), options: { bold: true, color: 'F8FAFC', fill: { color: bg }, fontSize: 11, align: 'center' as const } },
-        { text: trunc(c.strength, 40), options: { color: T.accent2, fill: { color: bg }, fontSize: 10 } },
-        { text: trunc(c.weakness, 40), options: { color: 'F87171', fill: { color: bg }, fontSize: 10 } },
+        { text: toTag(c.name, 16), options: { bold: true, color: 'F8FAFC', fill: { color: bg }, fontSize: 11, align: 'center' as const } },
+        { text: toTag(c.strength, 30), options: { color: T.accent2, fill: { color: bg }, fontSize: 10 } },
+        { text: toTag(c.weakness, 30), options: { color: 'F87171', fill: { color: bg }, fontSize: 10 } },
       ]);
     });
 
@@ -392,13 +495,12 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addHeader(slide, T, '策略路線圖');
 
     const items = result.roadmap.slice(0, 4);
-    const itemH = CONTENT_H / items.length; // = 5.95 / N
+    const itemH = CONTENT_H / items.length;
 
     items.forEach((item, i) => {
       const y = SAFE_T + i * itemH;
-      const itemBottom = y + itemH;
 
-      // 時間軸線 — 嚴格不超過下一個 item 的起始
+      // 時間軸線
       if (i < items.length - 1) {
         const lineTop = y + 0.3;
         const lineH = Math.min(itemH, SAFE_B - lineTop);
@@ -409,24 +511,24 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       slide.addText(`${i + 1}`, { x: 0.5, y: y + 0.12, w: 0.26, h: 0.26, fontSize: 9, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
 
       // Phase + timeframe
-      slide.addText(trunc(item.phase, 18), { x: 0.95, y, w: 3.5, h: 0.32, fontSize: 13, bold: true, color: T.accent });
+      slide.addText(toTag(item.phase, 18), { x: 0.95, y, w: 3.5, h: 0.32, fontSize: 13, bold: true, color: T.accent });
       slide.addShape('roundRect', { x: 4.6, y: y + 0.03, w: 1.5, h: 0.26, rectRadius: 0.13, fill: { type: 'solid', color: T.accent + '25' }, line: { color: T.accent + '60', width: 0.5 } });
-      slide.addText(trunc(item.timeframe, 14), { x: 4.6, y: y + 0.03, w: 1.5, h: 0.26, fontSize: 9, color: T.accent, align: 'center', valign: 'middle' });
+      slide.addText(toTag(item.timeframe, 14), { x: 4.6, y: y + 0.03, w: 1.5, h: 0.26, fontSize: 9, color: T.accent, align: 'center', valign: 'middle' });
 
-      // 內容卡 — 底邊 = y + itemH - 0.05，不超過 SAFE_B
+      // 內容卡
       const cardTop = y + 0.38;
       const cardH = Math.min(itemH - 0.43, SAFE_B - cardTop);
       if (cardH < 0.4) return;
       addCard(slide, T, 0.95, cardTop, 8.4, cardH);
 
-      // 產品（左半）
+      // 產品（左半）— 用 toTag 取關鍵詞
       slide.addText('產品', { x: 1.15, y: cardTop + 0.08, w: 0.7, h: 0.22, fontSize: 9, bold: true, color: T.accent2 });
-      slide.addText(trunc(item.product, 42), { x: 1.15, y: cardTop + 0.3, w: 3.7, h: cardH - 0.38, fontSize: 10, color: 'CBD5E1', lineSpacingMultiple: 1.3, valign: 'top' });
+      slide.addText(toTag(item.product, 38), { x: 1.15, y: cardTop + 0.3, w: 3.7, h: cardH - 0.38, fontSize: 10, color: 'CBD5E1', lineSpacingMultiple: 1.3, valign: 'top' });
       // 分隔
       slide.addShape('rect', { x: 5.1, y: cardTop + 0.08, w: 0.02, h: cardH - 0.16, fill: { type: 'solid', color: T.divider } });
-      // 技術（右半）
+      // 技術（右半）— 用 toTag 取關鍵詞
       slide.addText('技術', { x: 5.25, y: cardTop + 0.08, w: 0.7, h: 0.22, fontSize: 9, bold: true, color: T.accent3 });
-      slide.addText(trunc(item.technology, 42), { x: 5.25, y: cardTop + 0.3, w: 3.9, h: cardH - 0.38, fontSize: 10, color: 'CBD5E1', lineSpacingMultiple: 1.3, valign: 'top' });
+      slide.addText(toTag(item.technology, 38), { x: 5.25, y: cardTop + 0.3, w: 3.9, h: cardH - 0.38, fontSize: 10, color: 'CBD5E1', lineSpacingMultiple: 1.3, valign: 'top' });
     });
 
     addPageNum(slide, 6, TOTAL, T);
@@ -452,7 +554,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       const row = Math.floor(i / cols);
       const x = MARGIN + col * (cardW + gap);
       const y = SAFE_T + row * (cardH + gap);
-      if (y + cardH > SAFE_B) return; // 安全檢查
+      if (y + cardH > SAFE_B) return;
       const ic = r.impact === 'High' ? 'EF4444' : r.impact === 'Medium' ? 'FBBF24' : '10B981';
       const label = r.impact === 'High' ? '高' : r.impact === 'Medium' ? '中' : '低';
 
@@ -460,10 +562,12 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       slide.addShape('rect', { x, y, w: 0.04, h: cardH, fill: { type: 'solid', color: ic } });
       slide.addShape('roundRect', { x: x + cardW - 0.95, y: y + 0.1, w: 0.82, h: 0.26, rectRadius: 0.13, fill: { type: 'solid', color: ic + '30' }, line: { color: ic, width: 0.5 } });
       slide.addText(label, { x: x + cardW - 0.95, y: y + 0.1, w: 0.82, h: 0.26, fontSize: 9, bold: true, color: ic, align: 'center', valign: 'middle' });
-      slide.addText(trunc(r.risk, 26), { x: x + 0.18, y: y + 0.1, w: cardW - 1.2, h: 0.3, fontSize: 11, bold: true, color: 'F8FAFC' });
+      // 風險標題 — 用 toTag 精簡
+      slide.addText(toTag(r.risk, 24), { x: x + 0.18, y: y + 0.1, w: cardW - 1.2, h: 0.3, fontSize: 11, bold: true, color: 'F8FAFC' });
+      // 因應策略 — 用 toTag 精簡
       slide.addText([
         { text: '因應：', options: { fontSize: 9, color: '64748B', bold: true } },
-        { text: trunc(r.mitigation, 48), options: { fontSize: 9, color: 'CBD5E1' } },
+        { text: toTag(r.mitigation, 40), options: { fontSize: 9, color: 'CBD5E1' } },
       ], { x: x + 0.18, y: y + 0.45, w: cardW - 0.35, h: cardH - 0.55, lineSpacingMultiple: 1.35, valign: 'top' });
     });
 
@@ -490,7 +594,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       const row = Math.floor(i / cols);
       const x = MARGIN + col * (cardW + gap);
       const y = SAFE_T + row * (cardH + gap);
-      if (y + cardH > SAFE_B + 0.05) return; // 安全檢查
+      if (y + cardH > SAFE_B + 0.05) return;
       const sc = Number(p.score) || 0;
       const sC = scoreColor(sc);
 
@@ -498,7 +602,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       slide.addShape('rect', { x, y, w: cardW, h: 0.04, fill: { type: 'solid', color: sC } });
 
       // 角色名 + 分數
-      slide.addText(trunc(p.role, 14), { x: x + 0.15, y: y + 0.1, w: cardW - 1.1, h: 0.3, fontSize: 12, bold: true, color: 'F8FAFC' });
+      slide.addText(toTag(p.role, 12), { x: x + 0.15, y: y + 0.1, w: cardW - 1.1, h: 0.3, fontSize: 12, bold: true, color: 'F8FAFC' });
       slide.addText(`${sc}`, { x: x + cardW - 0.95, y: y + 0.08, w: 0.8, h: 0.32, fontSize: 18, bold: true, color: sC, align: 'right' });
 
       // 分數條
@@ -506,20 +610,20 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       slide.addShape('roundRect', { x: x + 0.15, y: y + 0.45, w: cardW - 0.3, h: 0.06, rectRadius: 0.03, fill: { type: 'solid', color: T.divider } });
       slide.addShape('roundRect', { x: x + 0.15, y: y + 0.45, w: Math.max(barW, 0.05), h: 0.06, rectRadius: 0.03, fill: { type: 'solid', color: sC } });
 
-      // 引言
+      // 引言 — 用 toQuote 提取最精華的一句
       const quoteH = Math.min(rows === 1 ? 0.85 : 0.55, cardH - 1.2);
-      slide.addText(`"${trunc(p.keyQuote, 32)}"`, {
+      slide.addText(`"${toQuote(p.keyQuote, 28)}"`, {
         x: x + 0.15, y: y + 0.58, w: cardW - 0.3, h: quoteH,
         fontSize: 9.5, italic: true, color: '94A3B8', lineSpacingMultiple: 1.3, valign: 'top',
       });
 
-      // 擔憂
+      // 擔憂 — 用 toTag 精簡
       const concernY = y + 0.58 + quoteH + 0.05;
       const concernH = cardH - (concernY - y) - 0.08;
       if (concernH > 0.2) {
         slide.addText([
           { text: '! ', options: { fontSize: 9, color: 'FBBF24', bold: true } },
-          { text: trunc(p.concern, 45), options: { fontSize: 9, color: 'CBD5E1' } },
+          { text: toTag(p.concern, 38), options: { fontSize: 9, color: 'CBD5E1' } },
         ], { x: x + 0.15, y: concernY, w: cardW - 0.3, h: concernH, lineSpacingMultiple: 1.3, valign: 'top' });
       }
     });
