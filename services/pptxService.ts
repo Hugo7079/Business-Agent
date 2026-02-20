@@ -3,124 +3,79 @@ import { AnalysisResult } from '../types';
 
 // ─── 文字工具 ────────────────────────────────────────────
 
-/** 安全截斷，不會切在詞中間 */
+/** 硬性截斷，超過就加省略號 */
 const trunc = (s: string, max: number): string => {
   if (!s) return '—';
-  const cleaned = stripFiller(s);
-  if (cleaned.length <= max) return cleaned;
-  return cleaned.slice(0, max - 1) + '…';
-};
-
-/** 移除冗贅語句、連接詞、語助詞，保留核心意思 */
-const stripFiller = (s: string): string => {
-  return s
-    .replace(/^(此外|另外|同時|因此|然而|不過|總之|換言之|簡而言之|綜上所述|值得注意的是|需要注意的是|具體來說|一般來說)[，,、]/g, '')
-    .replace(/(的話|而言|方面|層面|角度|部分|情況|狀況)$/g, '')
-    .replace(/^\s*(我們認為|我們建議|建議|預計|預期|估計|根據分析|經過評估|整體而言)\s*/g, '')
-    .replace(/[。！？!?.]+$/g, '')
-    .trim();
+  const t = s.trim().replace(/[。！？!?.]+$/g, '').trim();
+  return t.length <= max ? t : t.slice(0, max - 1) + '…';
 };
 
 /**
- * 把長段落拆成精簡 bullet 小標
- * - 先按句子拆分
- * - 每句提取核心短語（去掉冗贅開頭/結尾）
- * - 控制每條最多 maxLen 字
- * - 最多 maxLines 條
+ * 主要的 bullet 拆分函式
+ * 優先按 \n 拆（Gemini 新格式），否則按句號拆
+ * 每條強制在 maxLen 字以內，最多 maxLines 條
  */
-const toBullets = (text: string, maxLines = 4, maxLen = 40): string[] => {
+const toBullets = (text: string, maxLines = 5, maxLen = 22): string[] => {
   if (!text) return ['—'];
 
-  // 先按各種句號分割
-  const raw = text
-    .replace(/([。！？\.!?；;])/g, '$1|')
-    .split('|')
-    .map(s => s.replace(/[。！？\.!?；;]+$/g, '').trim())
-    .filter(s => s.length > 2);
-
-  const bullets: string[] = [];
-  const seen = new Set<string>();
-
-  for (const sentence of raw) {
-    if (bullets.length >= maxLines) break;
-
-    // 把長句拆成更小的分句（用逗號、頓號）
-    const clauses = sentence
-      .split(/[，,、]/)
-      .map(c => stripFiller(c.trim()))
-      .filter(c => c.length > 2);
-
-    if (clauses.length === 0) continue;
-
-    let point: string;
-    if (sentence.length <= maxLen) {
-      // 短句直接用
-      point = stripFiller(sentence);
-    } else if (clauses.length >= 2) {
-      // 長句：取最有資訊量的子句組合
-      // 優先取含數字或關鍵詞的子句
-      const ranked = clauses.sort((a, b) => {
-        const scoreA = (/\d/.test(a) ? 3 : 0) + (a.length > 4 ? 1 : 0) + (/[%億萬美元]/.test(a) ? 2 : 0);
-        const scoreB = (/\d/.test(b) ? 3 : 0) + (b.length > 4 ? 1 : 0) + (/[%億萬美元]/.test(b) ? 2 : 0);
-        return scoreB - scoreA;
-      });
-      // 組合前幾個子句，不超過 maxLen
-      let combined = ranked[0];
-      for (let j = 1; j < ranked.length; j++) {
-        const next = combined + '、' + ranked[j];
-        if (next.length > maxLen) break;
-        combined = next;
-      }
-      point = combined;
-    } else {
-      point = trunc(clauses[0], maxLen);
-    }
-
-    // 去重（避免語意重複的 bullet）
-    const key = point.slice(0, 8);
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    if (point.length > 1) bullets.push(point.length > maxLen ? trunc(point, maxLen) : point);
+  // 優先用 \n 分割（Gemini 新 schema 輸出格式）
+  const byNewline = text.split(/\n+/).map(s => s.trim()).filter(s => s.length > 1);
+  if (byNewline.length >= 2) {
+    return byNewline.slice(0, maxLines).map(s => trunc(s, maxLen));
   }
 
-  return bullets.length ? bullets : [trunc(text, maxLen)];
+  // fallback：按句號拆，再按逗號取第一段
+  const bySentence = text
+    .replace(/([。！？!?；;])/g, '$1\n')
+    .split('\n')
+    .map(s => s.replace(/[。！？!?；;]+$/g, '').trim())
+    .filter(s => s.length > 1);
+
+  const results: string[] = [];
+  for (const sentence of bySentence) {
+    if (results.length >= maxLines) break;
+    if (sentence.length <= maxLen) {
+      results.push(sentence);
+    } else {
+      // 按逗號拆，取最短有意義的子句
+      const parts = sentence.split(/[，,、]/).map(p => p.trim()).filter(p => p.length > 1);
+      results.push(trunc(parts[0] || sentence, maxLen));
+    }
+  }
+  return results.length ? results : [trunc(text, maxLen)];
 };
 
 /**
- * 把一段敘述濃縮成一個短標籤（用在 strength / weakness / concern / mitigation 等欄位）
- * 目標：≤ maxLen 字，像簡報小標而非完整句
+ * 單行標籤：優先取 \n 第一行，否則按逗號取第一段
+ * 用在 strength / weakness / concern / mitigation / KPI 值等單欄位
  */
-const toTag = (text: string, maxLen = 25): string => {
+const toTag = (text: string, maxLen = 20): string => {
   if (!text) return '—';
-  const cleaned = stripFiller(text);
-  // 如果已經夠短，直接用
+  // 有換行就取第一行
+  const firstLine = text.split(/\n/)[0].trim();
+  const cleaned = firstLine.replace(/[。！？!?.]+$/g, '').trim();
   if (cleaned.length <= maxLen) return cleaned;
-  // 用逗號拆分，取第一段最核心的
-  const parts = cleaned.split(/[，,、]/).map(p => p.trim()).filter(p => p.length > 2);
-  if (parts.length === 0) return trunc(cleaned, maxLen);
-  // 優先取含關鍵詞（數字、百分比）的子句
-  const best = parts.sort((a, b) => {
-    const sa = (/\d/.test(a) ? 2 : 0) + (a.length > 4 ? 1 : 0);
-    const sb = (/\d/.test(b) ? 2 : 0) + (b.length > 4 ? 1 : 0);
-    return sb - sa;
-  })[0];
-  return trunc(best, maxLen);
+  // 按逗號拆取第一段
+  const parts = cleaned.split(/[，,、]/).map(p => p.trim()).filter(p => p.length > 0);
+  return trunc(parts[0] || cleaned, maxLen);
 };
 
-/** 把長觀點文字壓成簡短引言（去頭去尾，取最有力的那句） */
-const toQuote = (text: string, maxLen = 30): string => {
+/**
+ * 引言專用：取整段中最短有力的一句（≤ maxLen 字）
+ */
+const toQuote = (text: string, maxLen = 18): string => {
   if (!text) return '—';
+  // 有換行先取第一行
+  const firstLine = text.split(/\n/)[0].trim().replace(/[。！？!?.]+$/g, '');
+  if (firstLine.length <= maxLen) return firstLine;
+  // 按句號拆，取最短的
   const sentences = text
-    .replace(/([。！？\.!?])/g, '$1|')
-    .split('|')
-    .map(s => stripFiller(s.trim()))
-    .filter(s => s.length > 3);
-  if (sentences.length === 0) return trunc(text, maxLen);
-  // 取最短但有意義的那句（通常最精準）
-  const sorted = sentences.filter(s => s.length >= 6).sort((a, b) => a.length - b.length);
-  const pick = sorted[0] || sentences[0];
-  return trunc(pick, maxLen);
+    .replace(/([。！？!?])/g, '$1\n')
+    .split('\n')
+    .map(s => s.replace(/[。！？!?]+$/g, '').trim())
+    .filter(s => s.length >= 4);
+  const shortest = sentences.sort((a, b) => a.length - b.length)[0] || firstLine;
+  return trunc(shortest, maxLen);
 };
 
 const fmt = (n: number) => {

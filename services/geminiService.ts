@@ -5,13 +5,13 @@ const analysisSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     successProbability: { type: Type.NUMBER, description: '0到100之間的整數，例如 65 代表 65%，絕對不可以用小數如 0.65' },
-    executiveSummary: { type: Type.STRING },
+    executiveSummary: { type: Type.STRING, description: '5到7個重點，每點用換行符\\n分隔，每點15字以內的短標題形式，不要完整句子。例如：「精準鎖定銀髮族痛點\\n市場規模達4000億美元\\n技術門檻低、模仿風險高」' },
     marketAnalysis: {
       type: Type.OBJECT,
       properties: {
-        size: { type: Type.STRING },
-        growthRate: { type: Type.STRING },
-        description: { type: Type.STRING },
+        size: { type: Type.STRING, description: '只填市場規模數字與單位，最多15字。例如：「全球 4,000億美元」或「台灣市場約50億元」' },
+        growthRate: { type: Type.STRING, description: '只填成長率數字，最多12字。例如：「年增 8.5%」或「CAGR 12%（2024-2030）」' },
+        description: { type: Type.STRING, description: '市場洞察，用3到5個重點，每點用換行符\\n分隔，每點20字以內的短標題形式，不要完整句子' },
       },
       required: ['size', 'growthRate', 'description'],
     },
@@ -20,9 +20,9 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          name: { type: Type.STRING },
-          strength: { type: Type.STRING },
-          weakness: { type: Type.STRING },
+          name: { type: Type.STRING, description: '競爭對手名稱，最多10字' },
+          strength: { type: Type.STRING, description: '核心優勢，最多15字的短標題，不要完整句子。例如：「品牌知名度高、通路廣」' },
+          weakness: { type: Type.STRING, description: '核心弱點，最多15字的短標題，不要完整句子。例如：「價格偏高、缺乏客製化」' },
         },
         required: ['name', 'strength', 'weakness'],
       },
@@ -32,10 +32,10 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          phase: { type: Type.STRING },
-          timeframe: { type: Type.STRING },
-          technology: { type: Type.STRING },
-          product: { type: Type.STRING },
+          phase: { type: Type.STRING, description: '階段名稱，最多10字的短標題。例如：「MVP 驗證期」' },
+          timeframe: { type: Type.STRING, description: '時間範圍，最多8字。例如：「第1-6個月」' },
+          technology: { type: Type.STRING, description: '核心技術，最多20字的短標題，用頓號分隔多項。例如：「感測器整合、App開發、IoT連接」' },
+          product: { type: Type.STRING, description: '產品里程碑，最多20字的短標題，用頓號分隔多項。例如：「原型打樣、用戶測試、上市發布」' },
         },
         required: ['phase', 'timeframe', 'technology', 'product'],
       },
@@ -45,7 +45,7 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          year: { type: Type.STRING },
+          year: { type: Type.STRING, description: '年度，例如「第1年」' },
           revenue: { type: Type.NUMBER },
           profit: { type: Type.NUMBER },
           costs: { type: Type.NUMBER },
@@ -53,15 +53,15 @@ const analysisSchema: Schema = {
         required: ['year', 'revenue', 'profit', 'costs'],
       },
     },
-    breakEvenPoint: { type: Type.STRING },
+    breakEvenPoint: { type: Type.STRING, description: '損益平衡時間點，最多15字。例如：「第2年Q3，月營收達120萬」' },
     risks: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          risk: { type: Type.STRING },
+          risk: { type: Type.STRING, description: '風險名稱，最多15字的短標題。例如：「競品快速模仿」或「供應鏈斷裂風險」' },
           impact: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-          mitigation: { type: Type.STRING },
+          mitigation: { type: Type.STRING, description: '因應對策，最多20字的短標題，不要完整句子。例如：「申請設計專利、建立品牌護城河」' },
         },
         required: ['risk', 'impact', 'mitigation'],
       },
@@ -71,12 +71,12 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          role: { type: Type.STRING },
+          role: { type: Type.STRING, description: '角色名稱，最多8字。例如：「風險投資人」' },
           icon: { type: Type.STRING },
-          perspective: { type: Type.STRING, description: '此角色對提案的詳細看法，至少 50 字' },
+          perspective: { type: Type.STRING, description: '此角色對提案的看法，用3到4個重點，每點用換行符\\n分隔，每點15字以內' },
           score: { type: Type.NUMBER, description: '0到100之間的整數評分' },
-          keyQuote: { type: Type.STRING, description: '此角色最具代表性的一句話引言' },
-          concern: { type: Type.STRING, description: '此角色最主要的擔憂，必填，至少 20 字' },
+          keyQuote: { type: Type.STRING, description: '此角色最具代表性的一句話，15字以內，像口號或金句，不要解釋性語句。例如：「潛力在，但護城河太淺」' },
+          concern: { type: Type.STRING, description: '最主要的擔憂，最多18字的短標題。例如：「技術門檻低易被複製」' },
         },
         required: ['role', 'icon', 'perspective', 'score', 'keyQuote', 'concern'],
       },
@@ -85,9 +85,9 @@ const analysisSchema: Schema = {
     finalVerdicts: {
       type: Type.OBJECT,
       properties: {
-        aggressive: { type: Type.STRING },
-        balanced: { type: Type.STRING },
-        conservative: { type: Type.STRING },
+        aggressive: { type: Type.STRING, description: '激進觀點，用4到6個重點，每點用換行符\\n分隔，每點15字以內的短標題形式' },
+        balanced: { type: Type.STRING, description: '平衡觀點，用4到6個重點，每點用換行符\\n分隔，每點15字以內的短標題形式' },
+        conservative: { type: Type.STRING, description: '保守觀點，用4到6個重點，每點用換行符\\n分隔，每點15字以內的短標題形式' },
       },
       required: ['aggressive', 'balanced', 'conservative'],
     },
