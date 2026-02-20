@@ -113,35 +113,39 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
         <div className="chart-card">
           <div className="chart-title"><BarChart3 size={20} style={{color:'#34d399'}} /> 財務預測</div>
           <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={result.financials}>
-                <defs>
-                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorProf" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="year" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }} />
-                <Legend />
-                <Area type="monotone" dataKey="revenue" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRev)" name="營收" />
-                <Area type="monotone" dataKey="profit" stroke="#10b981" fillOpacity={1} fill="url(#colorProf)" name="淨利" />
-                <Area type="monotone" dataKey="costs" stroke="#ef4444" fill="transparent" strokeDasharray="5 5" name="成本" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {result.financials && result.financials.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={result.financials}>
+                  <defs>
+                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorProf" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="year" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }} />
+                  <Legend />
+                  <Area type="monotone" dataKey="revenue" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRev)" name="營收" />
+                  <Area type="monotone" dataKey="profit" stroke="#10b981" fillOpacity={1} fill="url(#colorProf)" name="淨利" />
+                  <Area type="monotone" dataKey="costs" stroke="#ef4444" fill="transparent" strokeDasharray="5 5" name="成本" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="empty-state">⚠ AI 未提供足夠資訊以產生財務預測圖表</div>
+            )}
           </div>
         </div>
 
         <div className="chart-card">
           <div className="chart-title"><TrendingUp size={20} style={{color:'#818cf8'}} /> 策略路線圖</div>
           <div className="roadmap-list">
-            {result.roadmap.map((item, idx) => (
+            {result.roadmap && result.roadmap.length > 0 ? result.roadmap.map((item, idx) => (
               <div className="roadmap-item" key={idx}>
                 <div className="roadmap-dot" />
                 <div className="roadmap-phase">{item.timeframe} - {item.phase}</div>
@@ -149,16 +153,18 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
                   <div className="roadmap-cols">
                     <div style={{flex:1}}>
                       <span className="roadmap-col-label">產品 (Product)</span>
-                      <span className="roadmap-col-val">{item.product}</span>
+                      <span className="roadmap-col-val">{item.product || '—'}</span>
                     </div>
                     <div style={{flex:1}}>
                       <span className="roadmap-col-label">技術 (Technology)</span>
-                      <span className="roadmap-col-val">{item.technology}</span>
+                      <span className="roadmap-col-val">{item.technology || '—'}</span>
                     </div>
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="empty-state">⚠ AI 未提供策略路線圖資料</div>
+            )}
           </div>
         </div>
       </div>
