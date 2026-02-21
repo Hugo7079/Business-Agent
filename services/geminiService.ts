@@ -443,7 +443,7 @@ export const generateThemeImage = async (
     `Mood: innovative, inspiring, premium investor presentation.`;
 
   // 強制使用 imagen-3.0-generate-001
-  const modelName = 'imagen-3.0-generate-001';
+  const modelName = 'imagen-3.0-fast-generate-001';
   try {
     const response = await ai.models.generateImages({
       model: modelName,
