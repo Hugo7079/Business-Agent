@@ -5,13 +5,13 @@ const analysisSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     successProbability: { type: Type.NUMBER, description: '0到100之間的整數，例如 65 代表 65%，絕對不可以用小數如 0.65' },
-    executiveSummary: { type: Type.STRING, description: '5到7個重點，每點用換行符\\n分隔，每點15字以內的短標題形式，不要完整句子。例如：「精準鎖定銀髮族痛點\\n市場規模達4000億美元\\n技術門檻低、模仿風險高」' },
+    executiveSummary: { type: Type.STRING, description: '5到7個重點，每點用換行符\\n分隔，每點為完整的分析句子，充分說明理由與依據' },
     marketAnalysis: {
       type: Type.OBJECT,
       properties: {
-        size: { type: Type.STRING, description: '只填市場規模數字與單位，最多15字。例如：「全球 4,000億美元」或「台灣市場約50億元」' },
-        growthRate: { type: Type.STRING, description: '只填成長率數字，最多12字。例如：「年增 8.5%」或「CAGR 12%（2024-2030）」' },
-        description: { type: Type.STRING, description: '市場洞察，用3到5個重點，每點用換行符\\n分隔，每點20字以內的短標題形式，不要完整句子' },
+        size: { type: Type.STRING, description: '市場規模，包含數字、單位與來源依據' },
+        growthRate: { type: Type.STRING, description: '成長率，包含數字、時間區間與依據' },
+        description: { type: Type.STRING, description: '市場洞察，用3到5個重點，每點用換行符\\n分隔，每點為完整分析句子' },
       },
       required: ['size', 'growthRate', 'description'],
     },
@@ -20,9 +20,9 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          name: { type: Type.STRING, description: '競爭對手名稱，最多10字' },
-          strength: { type: Type.STRING, description: '核心優勢，最多15字的短標題，不要完整句子。例如：「品牌知名度高、通路廣」' },
-          weakness: { type: Type.STRING, description: '核心弱點，最多15字的短標題，不要完整句子。例如：「價格偏高、缺乏客製化」' },
+          name: { type: Type.STRING, description: '競爭對手名稱' },
+          strength: { type: Type.STRING, description: '核心優勢，完整說明其競爭優勢的原因與影響' },
+          weakness: { type: Type.STRING, description: '核心弱點，完整說明其弱點的原因與影響' },
         },
         required: ['name', 'strength', 'weakness'],
       },
@@ -32,10 +32,10 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          phase: { type: Type.STRING, description: '階段名稱，最多10字的短標題。例如：「MVP 驗證期」' },
-          timeframe: { type: Type.STRING, description: '時間範圍，最多8字。例如：「第1-6個月」' },
-          technology: { type: Type.STRING, description: '核心技術，最多20字的短標題，用頓號分隔多項。例如：「感測器整合、App開發、IoT連接」' },
-          product: { type: Type.STRING, description: '產品里程碑，最多20字的短標題，用頓號分隔多項。例如：「原型打樣、用戶測試、上市發布」' },
+          phase: { type: Type.STRING, description: '階段名稱' },
+          timeframe: { type: Type.STRING, description: '時間範圍' },
+          technology: { type: Type.STRING, description: '核心技術，詳細說明需要的技術棧與實作方式' },
+          product: { type: Type.STRING, description: '產品里程碑，詳細說明該階段的產品目標與交付物' },
         },
         required: ['phase', 'timeframe', 'technology', 'product'],
       },
@@ -53,15 +53,15 @@ const analysisSchema: Schema = {
         required: ['year', 'revenue', 'profit', 'costs'],
       },
     },
-    breakEvenPoint: { type: Type.STRING, description: '損益平衡時間點，最多15字。例如：「第2年Q3，月營收達120萬」' },
+    breakEvenPoint: { type: Type.STRING, description: '損益平衡時間點與條件，詳細說明達成損益平衡所需的條件' },
     risks: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          risk: { type: Type.STRING, description: '風險名稱，最多15字的短標題。例如：「競品快速模仿」或「供應鏈斷裂風險」' },
+          risk: { type: Type.STRING, description: '風險名稱與完整描述' },
           impact: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-          mitigation: { type: Type.STRING, description: '因應對策，最多20字的短標題，不要完整句子。例如：「申請設計專利、建立品牌護城河」' },
+          mitigation: { type: Type.STRING, description: '因應對策，完整說明應對方式與執行步驟' },
         },
         required: ['risk', 'impact', 'mitigation'],
       },
@@ -71,23 +71,23 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          role: { type: Type.STRING, description: '角色名稱，最多8字。例如：「風險投資人」' },
+          role: { type: Type.STRING, description: '角色名稱' },
           icon: { type: Type.STRING },
-          perspective: { type: Type.STRING, description: '此角色對提案的看法，用3到4個重點，每點用換行符\\n分隔，每點15字以內' },
+          perspective: { type: Type.STRING, description: '此角色對提案的完整看法，用3到4個重點，每點用換行符\\n分隔，每點為完整分析句子，充分表達該角色的立場與理由' },
           score: { type: Type.NUMBER, description: '0到100之間的整數評分' },
-          keyQuote: { type: Type.STRING, description: '此角色最具代表性的一句話，15字以內，像口號或金句，不要解釋性語句。例如：「潛力在，但護城河太淺」' },
-          concern: { type: Type.STRING, description: '最主要的擔憂，最多18字的短標題。例如：「技術門檻低易被複製」' },
+          keyQuote: { type: Type.STRING, description: '此角色最具代表性的一句話，像口號或金句，直接表達核心立場' },
+          concern: { type: Type.STRING, description: '最主要的擔憂，完整說明擔憂的原因與潛在後果' },
         },
         required: ['role', 'icon', 'perspective', 'score', 'keyQuote', 'concern'],
       },
     },
-    teamAnalysis: { type: Type.STRING },
+    teamAnalysis: { type: Type.STRING, description: '團隊能力分析，完整評估現有團隊與所需人才缺口' },
     finalVerdicts: {
       type: Type.OBJECT,
       properties: {
-        aggressive: { type: Type.STRING, description: '激進觀點，用4到6個重點，每點用換行符\\n分隔，每點15字以內的短標題形式' },
-        balanced: { type: Type.STRING, description: '平衡觀點，用4到6個重點，每點用換行符\\n分隔，每點15字以內的短標題形式' },
-        conservative: { type: Type.STRING, description: '保守觀點，用4到6個重點，每點用換行符\\n分隔，每點15字以內的短標題形式' },
+        aggressive: { type: Type.STRING, description: '激進觀點，用4到6個重點，每點用換行符\\n分隔，每點為完整的分析句子，充分闡述激進策略的論點、機會與行動建議' },
+        balanced: { type: Type.STRING, description: '平衡觀點，用4到6個重點，每點用換行符\\n分隔，每點為完整的分析句子，充分闡述平衡策略的論點、取捨與執行建議' },
+        conservative: { type: Type.STRING, description: '保守觀點，用4到6個重點，每點用換行符\\n分隔，每點為完整的分析句子，充分闡述保守策略的論點、風險控制與謹慎行動方案' },
       },
       required: ['aggressive', 'balanced', 'conservative'],
     },
@@ -233,7 +233,7 @@ successProbability 的評分依據：市場可行性 30% + 競爭優勢 25% + �
 - 市場資料：${data.marketData}
 - 產品細節：${data.productDetails}
 - 市場痛點：${data.painPoints}
-- 目標客群：${data.targetConsumer}
+- 目標消費者：${data.targetConsumer}
 - 財務背景：${data.financialContext}`;
 
   try {
@@ -332,6 +332,139 @@ Return ONLY raw Python code. No markdown fences. No explanation. Start with impo
     let code = response.text?.trim() || '';
     code = code.replace(/^```python\n?/m, '').replace(/^```\n?/m, '').replace(/\n?```$/m, '');
     return code;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+const slidesSummarySchema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    executiveSummary: {
+      type: Type.STRING,
+      description: '5到7個重點，每點用\\n分隔，每點為完整的分析句子',
+    },
+    marketDescription: {
+      type: Type.STRING,
+      description: '3到5個市場洞察重點，每點用\\n分隔，每點為完整的分析句子',
+    },
+    competitors: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name:     { type: Type.STRING, description: '競爭對手名稱' },
+          strength: { type: Type.STRING, description: '核心優勢的完整說明' },
+          weakness: { type: Type.STRING, description: '核心弱點的完整說明' },
+        },
+        required: ['name', 'strength', 'weakness'],
+      },
+    },
+    roadmap: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          phase:      { type: Type.STRING, description: '階段名稱' },
+          timeframe:  { type: Type.STRING, description: '時間範圍' },
+          technology: { type: Type.STRING, description: '核心技術說明' },
+          product:    { type: Type.STRING, description: '產品里程碑說明' },
+        },
+        required: ['phase', 'timeframe', 'technology', 'product'],
+      },
+    },
+    breakEvenPoint: { type: Type.STRING, description: '損益平衡時間點與條件說明' },
+    risks: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          risk:       { type: Type.STRING, description: '風險名稱與描述' },
+          impact:     { type: Type.STRING, enum: ['High', 'Medium', 'Low'] },
+          mitigation: { type: Type.STRING, description: '因應對策說明' },
+        },
+        required: ['risk', 'impact', 'mitigation'],
+      },
+    },
+    personaEvaluations: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          role:        { type: Type.STRING, description: '角色名稱' },
+          icon:        { type: Type.STRING },
+          score:       { type: Type.NUMBER },
+          keyQuote:    { type: Type.STRING, description: '最具代表性的一句話，直接表達核心立場' },
+          concern:     { type: Type.STRING, description: '最主要擔憂的完整說明' },
+          perspective: { type: Type.STRING, description: '3到4個重點，每點用\\n分隔，每點為完整分析句子' },
+        },
+        required: ['role', 'icon', 'score', 'keyQuote', 'concern', 'perspective'],
+      },
+    },
+    finalVerdicts: {
+      type: Type.OBJECT,
+      properties: {
+        aggressive:   { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述激進策略的論點' },
+        balanced:     { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述平衡策略的論點' },
+        conservative: { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述保守策略的論點' },
+      },
+      required: ['aggressive', 'balanced', 'conservative'],
+    },
+  },
+  required: [
+    'executiveSummary', 'marketDescription', 'competitors', 'roadmap',
+    'breakEvenPoint', 'risks', 'personaEvaluations', 'finalVerdicts',
+  ],
+};
+
+export const summarizeForSlides = async (result: AnalysisResult): Promise<AnalysisResult> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `你是一位專業的簡報設計師。
+以下是一份商業分析報告的完整原始資料（JSON格式）。
+請將其中的長文欄位整理成適合放在投影片上的重點條列。
+規則：
+- 保留最重要的資訊，去除贅詞
+- 每個重點為完整的分析句子，清楚傳達核心觀點
+- 多個重點之間用 \\n 分隔
+- 數字、專有名詞、品牌名稱必須保留
+- 不限制字數，以完整表達意思為優先
+- 所有輸出必須使用繁體中文
+
+原始資料：
+${JSON.stringify(result, null, 2)}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: slidesSummarySchema,
+      },
+    });
+
+    const summary = JSON.parse(response.text!);
+
+    // 合併回原始 result，只覆蓋文字欄位，數字與財務資料維持原樣
+    return {
+      ...result,
+      executiveSummary: summary.executiveSummary,
+      marketAnalysis: {
+        ...result.marketAnalysis,
+        description: summary.marketDescription,
+      },
+      competitors: summary.competitors,
+      roadmap: summary.roadmap,
+      breakEvenPoint: summary.breakEvenPoint,
+      risks: summary.risks,
+      personaEvaluations: result.personaEvaluations.map((p, i) => ({
+        ...p,
+        ...(summary.personaEvaluations[i] ?? {}),
+      })),
+      finalVerdicts: summary.finalVerdicts,
+    };
   } catch (error) {
     handleApiError(error);
   }
