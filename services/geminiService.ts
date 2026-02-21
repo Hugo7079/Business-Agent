@@ -91,11 +91,12 @@ const analysisSchema: Schema = {
       },
       required: ['aggressive', 'balanced', 'conservative'],
     },
+    continueToIterate: { type: Type.STRING, description: '持續迭代建議，用4到6個重點，每點用換行符\\n分隔，每點為完整的分析句子，充分闡述下一步的具體行動與優化方向' },
   },
   required: [
     "successProbability", "executiveSummary", "marketAnalysis", "competitors",
     "roadmap", "financials", "breakEvenPoint", "risks",
-    "personaEvaluations", "teamAnalysis", "finalVerdicts"
+    "personaEvaluations", "teamAnalysis", "finalVerdicts", "continueToIterate"
   ],
 };
 
@@ -410,10 +411,11 @@ const slidesSummarySchema: Schema = {
       },
       required: ['aggressive', 'balanced', 'conservative'],
     },
+    continueToIterate: { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述下一步的具體行動與優化方向' },
   },
   required: [
     'executiveSummary', 'marketDescription', 'competitors', 'roadmap',
-    'breakEvenPoint', 'risks', 'personaEvaluations', 'finalVerdicts',
+    'breakEvenPoint', 'risks', 'personaEvaluations', 'finalVerdicts', 'continueToIterate'
   ],
 };
 
@@ -425,12 +427,12 @@ export const summarizeForSlides = async (result: AnalysisResult): Promise<Analys
 以下是一份商業分析報告的完整原始資料（JSON格式）。
 請將其中的長文欄位整理成適合放在投影片上的重點條列。
 規則：
-- 保留最重要的資訊，去除贅詞
-- 每個重點為完整的分析句子，清楚傳達核心觀點
-- 多個重點之間用 \\n 分隔
-- 數字、專有名詞、品牌名稱必須保留
-- 不限制字數，以完整表達意思為優先
-- 所有輸出必須使用繁體中文
+- 為了配合投影片排版，請極度精簡文字，去除所有贅詞。
+- 每個重點必須簡短有力，直接切入核心。
+- 多個重點之間用 \\n 分隔。
+- 數字、專有名詞、品牌名稱必須保留。
+- 每個重點盡量控制在 15-25 字以內，避免過長的句子。
+- 所有輸出必須使用繁體中文。
 
 原始資料：
 ${JSON.stringify(result, null, 2)}`;
@@ -464,6 +466,7 @@ ${JSON.stringify(result, null, 2)}`;
         ...(summary.personaEvaluations[i] ?? {}),
       })),
       finalVerdicts: summary.finalVerdicts,
+      continueToIterate: summary.continueToIterate,
     };
   } catch (error) {
     handleApiError(error);

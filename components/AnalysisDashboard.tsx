@@ -214,6 +214,11 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
         <div className="verdict-conservative"><h4>保守觀點</h4><p className="verdict-text">{result.finalVerdicts.conservative}</p></div>
       </div>
 
+      <div className="card section-gap" style={{ marginTop: '2rem' }}>
+        <div className="card-title"><TrendingUp size={20} style={{color:'#10b981'}} /> 持續迭代建議</div>
+        <p className="summary-text" style={{ whiteSpace: 'pre-line' }}>{result.continueToIterate}</p>
+      </div>
+
       {/* PPT CTA Banner at bottom */}
       <div className="ppt-cta-banner">
         <div className="ppt-cta-left">
