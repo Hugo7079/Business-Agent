@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type, Schema, PersonGeneration } from "@google/genai";
 import { AnalysisMode, BusinessInput, AnalysisResult, ParsedInputResponse } from "../types";
 
 const analysisSchema: Schema = {
@@ -9,8 +9,8 @@ const analysisSchema: Schema = {
     marketAnalysis: {
       type: Type.OBJECT,
       properties: {
-        size: { type: Type.STRING, description: '市場規模，包含數字、單位與來源依據' },
-        growthRate: { type: Type.STRING, description: '成長率，包含數字、時間區間與依據' },
+        size: { type: Type.STRING, description: '市場規模，必須極度精簡，最多20個中文字，格式如：全球 XXX 市場規模約 $XXX（XXXX年）' },
+        growthRate: { type: Type.STRING, description: '成長率，必須極度精簡，最多20個中文字，格式如：CAGR XX%（XXXX–XXXX年）' },
         description: { type: Type.STRING, description: '市場洞察，用3到5個重點，每點用換行符\\n分隔，每點為完整分析句子' },
       },
       required: ['size', 'growthRate', 'description'],
@@ -32,10 +32,10 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          phase: { type: Type.STRING, description: '階段名稱' },
-          timeframe: { type: Type.STRING, description: '時間範圍' },
-          technology: { type: Type.STRING, description: '核心技術，詳細說明需要的技術棧與實作方式' },
-          product: { type: Type.STRING, description: '產品里程碑，詳細說明該階段的產品目標與交付物' },
+          phase: { type: Type.STRING, description: '階段名稱，最多10個中文字' },
+          timeframe: { type: Type.STRING, description: '時間範圍，最多8個中文字，如：第1-6個月' },
+          technology: { type: Type.STRING, description: '核心技術，極度精簡，最多2-3行，每行15字以內，只列最關鍵技術棧' },
+          product: { type: Type.STRING, description: '產品里程碑，極度精簡，最多2-3行，每行15字以內，只列最關鍵交付物' },
         },
         required: ['phase', 'timeframe', 'technology', 'product'],
       },
@@ -53,15 +53,15 @@ const analysisSchema: Schema = {
         required: ['year', 'revenue', 'profit', 'costs'],
       },
     },
-    breakEvenPoint: { type: Type.STRING, description: '損益平衡時間點與條件，詳細說明達成損益平衡所需的條件' },
+    breakEvenPoint: { type: Type.STRING, description: '損益平衡，必須極度精簡，最多24個中文字，格式如：預計第X年達成，月營收需達 $XXX' },
     risks: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          risk: { type: Type.STRING, description: '風險名稱與完整描述' },
+          risk: { type: Type.STRING, description: '風險名稱，最多12個中文字，簡短有力' },
           impact: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
-          mitigation: { type: Type.STRING, description: '因應對策，完整說明應對方式與執行步驟' },
+          mitigation: { type: Type.STRING, description: '因應對策，精簡說明，最多40個中文字' },
         },
         required: ['risk', 'impact', 'mitigation'],
       },
@@ -71,12 +71,12 @@ const analysisSchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          role: { type: Type.STRING, description: '角色名稱' },
+          role: { type: Type.STRING, description: '角色名稱，最多8個中文字' },
           icon: { type: Type.STRING },
           perspective: { type: Type.STRING, description: '此角色對提案的完整看法，用3到4個重點，每點用換行符\\n分隔，每點為完整分析句子，充分表達該角色的立場與理由' },
           score: { type: Type.NUMBER, description: '0到100之間的整數評分' },
-          keyQuote: { type: Type.STRING, description: '此角色最具代表性的一句話，像口號或金句，直接表達核心立場' },
-          concern: { type: Type.STRING, description: '最主要的擔憂，完整說明擔憂的原因與潛在後果' },
+          keyQuote: { type: Type.STRING, description: '此角色最具代表性的一句話，最多20個中文字，像口號或金句，直接表達核心立場' },
+          concern: { type: Type.STRING, description: '最主要的擔憂，精簡說明，最多50個中文字' },
         },
         required: ['role', 'icon', 'perspective', 'score', 'keyQuote', 'concern'],
       },
@@ -343,11 +343,19 @@ const slidesSummarySchema: Schema = {
   properties: {
     executiveSummary: {
       type: Type.STRING,
-      description: '5到7個重點，每點用\\n分隔，每點為完整的分析句子',
+      description: '5到7個重點，每點用\\n分隔，每點為完整的分析句子，極度精簡，避免冗長',
+    },
+    marketSize: {
+      type: Type.STRING,
+      description: 'TAM市場規模，絕對不能超過24個中文字（含數字與符號），格式如：全球 XXX 市場約 $XXX（XXXX年）',
+    },
+    marketGrowthRate: {
+      type: Type.STRING,
+      description: 'CAGR年均成長率，絕對不能超過24個中文字（含數字與符號），格式如：CAGR XX%（XXXX–XXXX年）',
     },
     marketDescription: {
       type: Type.STRING,
-      description: '3到5個市場洞察重點，每點用\\n分隔，每點為完整的分析句子',
+      description: '3到5個市場洞察重點，每點用\\n分隔，每點為完整的分析句子，極度精簡，避免冗長',
     },
     competitors: {
       type: Type.ARRAY,
@@ -355,8 +363,8 @@ const slidesSummarySchema: Schema = {
         type: Type.OBJECT,
         properties: {
           name:     { type: Type.STRING, description: '競爭對手名稱' },
-          strength: { type: Type.STRING, description: '核心優勢的完整說明' },
-          weakness: { type: Type.STRING, description: '核心弱點的完整說明' },
+          strength: { type: Type.STRING, description: '核心優勢，極度精簡，最多30個中文字' },
+          weakness: { type: Type.STRING, description: '核心弱點，極度精簡，最多30個中文字' },
         },
         required: ['name', 'strength', 'weakness'],
       },
@@ -366,23 +374,26 @@ const slidesSummarySchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          phase:      { type: Type.STRING, description: '階段名稱' },
-          timeframe:  { type: Type.STRING, description: '時間範圍' },
-          technology: { type: Type.STRING, description: '核心技術說明' },
-          product:    { type: Type.STRING, description: '產品里程碑說明' },
+          phase:      { type: Type.STRING, description: '階段名稱，最多10個中文字' },
+          timeframe:  { type: Type.STRING, description: '時間範圍，最多8個中文字' },
+          technology: { type: Type.STRING, description: '核心技術，絕對不超過3行，每行絕對不超過12個中文字，只寫技術名稱' },
+          product:    { type: Type.STRING, description: '產品里程碑，絕對不超過3行，每行絕對不超過12個中文字，只寫交付物名稱' },
         },
         required: ['phase', 'timeframe', 'technology', 'product'],
       },
     },
-    breakEvenPoint: { type: Type.STRING, description: '損益平衡時間點與條件說明' },
+    breakEvenPoint: {
+      type: Type.STRING,
+      description: '損益平衡點，絕對不能超過24個中文字（含數字與符號），只保留時間點與關鍵數字，格式如：第X年達成，月營收需達 $XXX',
+    },
     risks: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
-          risk:       { type: Type.STRING, description: '風險名稱與描述' },
+          risk:       { type: Type.STRING, description: '風險名稱，最多12個中文字' },
           impact:     { type: Type.STRING, enum: ['High', 'Medium', 'Low'] },
-          mitigation: { type: Type.STRING, description: '因應對策說明' },
+          mitigation: { type: Type.STRING, description: '因應對策，最多40個中文字' },
         },
         required: ['risk', 'impact', 'mitigation'],
       },
@@ -392,12 +403,12 @@ const slidesSummarySchema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: {
-          role:        { type: Type.STRING, description: '角色名稱' },
+          role:        { type: Type.STRING, description: '角色名稱，最多8個中文字' },
           icon:        { type: Type.STRING },
           score:       { type: Type.NUMBER },
-          keyQuote:    { type: Type.STRING, description: '最具代表性的一句話，直接表達核心立場' },
-          concern:     { type: Type.STRING, description: '最主要擔憂的完整說明' },
-          perspective: { type: Type.STRING, description: '3到4個重點，每點用\\n分隔，每點為完整分析句子' },
+          keyQuote:    { type: Type.STRING, description: '最具代表性的一句話，最多20個中文字' },
+          concern:     { type: Type.STRING, description: '最主要擔憂，最多50個中文字' },
+          perspective: { type: Type.STRING, description: '3到4個重點，每點用\\n分隔，每點為完整分析句子，每點最多25字' },
         },
         required: ['role', 'icon', 'score', 'keyQuote', 'concern', 'perspective'],
       },
@@ -405,17 +416,18 @@ const slidesSummarySchema: Schema = {
     finalVerdicts: {
       type: Type.OBJECT,
       properties: {
-        aggressive:   { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述激進策略的論點' },
-        balanced:     { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述平衡策略的論點' },
-        conservative: { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述保守策略的論點' },
+        aggressive:   { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點最多25字，極度精簡' },
+        balanced:     { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點最多25字，極度精簡' },
+        conservative: { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點最多25字，極度精簡' },
       },
       required: ['aggressive', 'balanced', 'conservative'],
     },
-    continueToIterate: { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點為完整的分析句子，充分闡述下一步的具體行動與優化方向' },
+    continueToIterate: { type: Type.STRING, description: '4到6個重點，每點用\\n分隔，每點最多25字，極度精簡' },
   },
   required: [
-    'executiveSummary', 'marketDescription', 'competitors', 'roadmap',
-    'breakEvenPoint', 'risks', 'personaEvaluations', 'finalVerdicts', 'continueToIterate'
+    'executiveSummary', 'marketSize', 'marketGrowthRate', 'marketDescription',
+    'competitors', 'roadmap', 'breakEvenPoint', 'risks',
+    'personaEvaluations', 'finalVerdicts', 'continueToIterate'
   ],
 };
 
@@ -423,16 +435,24 @@ export const summarizeForSlides = async (result: AnalysisResult): Promise<Analys
   const apiKey = getApiKey();
   const ai = new GoogleGenAI({ apiKey });
 
-  const prompt = `你是一位專業的簡報設計師。
-以下是一份商業分析報告的完整原始資料（JSON格式）。
-請將其中的長文欄位整理成適合放在投影片上的重點條列。
-規則：
-- 為了配合投影片排版，請極度精簡文字，去除所有贅詞。
-- 每個重點必須簡短有力，直接切入核心。
-- 多個重點之間用 \\n 分隔。
-- 數字、專有名詞、品牌名稱必須保留。
-- 每個重點盡量控制在 15-25 字以內，避免過長的句子。
-- 所有輸出必須使用繁體中文。
+  const prompt = `你是一位專業的投影片簡報設計師，擅長將長篇報告壓縮成投影片可用的超短文字。
+
+以下是一份商業分析報告（JSON格式），請按照嚴格規則精簡每個欄位：
+
+【絕對字數上限，違反即為錯誤】
+- marketSize（TAM市場規模）：絕對不超過 24 字，只保留數字與單位
+- marketGrowthRate（CAGR年均成長）：絕對不超過 24 字，只保留數字與年份
+- breakEvenPoint（損益平衡點）：絕對不超過 24 字，只保留時間點與關鍵數字
+- roadmap 每個階段的 technology：絕對不超過 3 行，每行不超過 12 字，只寫技術名稱
+- roadmap 每個階段的 product：絕對不超過 3 行，每行不超過 12 字，只寫交付物名稱
+- 其他重點條列：每點不超過 25 字
+
+【通用規則】
+- 去除所有「由於」「因此」「透過」「藉由」等連接詞
+- 去除所有說明性語句，只保留核心事實與數字
+- 數字、專有名詞、品牌名稱必須保留
+- 所有輸出必須使用繁體中文
+- 多個重點之間用 \\n 分隔
 
 原始資料：
 ${JSON.stringify(result, null, 2)}`;
@@ -455,6 +475,8 @@ ${JSON.stringify(result, null, 2)}`;
       executiveSummary: summary.executiveSummary,
       marketAnalysis: {
         ...result.marketAnalysis,
+        size:        summary.marketSize,
+        growthRate:  summary.marketGrowthRate,
         description: summary.marketDescription,
       },
       competitors: summary.competitors,
@@ -470,5 +492,62 @@ ${JSON.stringify(result, null, 2)}`;
     };
   } catch (error) {
     handleApiError(error);
+  }
+};
+
+export const generateThemeImage = async (
+  summary: string,
+  marketDesc: string,
+): Promise<string | null> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+
+  // 先用 Gemini Flash 根據提案內容生成一句英文圖片描述
+  let themeKeyword = 'modern business strategy, professional team, innovation';
+  try {
+    const kwResp = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [{
+        role: 'user',
+        parts: [{ text:
+          `Based on this business proposal summary, write ONE short English phrase (max 12 words) describing the core industry/theme for an image generation prompt. Only output the phrase, nothing else.\n\nSummary: ${summary}\nMarket: ${marketDesc}`
+        }]
+      }],
+    });
+    const kw = kwResp.text?.trim().replace(/['"]/g, '');
+    if (kw && kw.length > 3) themeKeyword = kw;
+  } catch (e) {
+    console.warn('[Imagen] keyword generation failed, using default:', e);
+  }
+
+  const imagePrompt =
+    `A cinematic, ultra-detailed dark-themed illustration for a business pitch deck. ` +
+    `Theme: ${themeKeyword}. ` +
+    `Style: dark background, neon accent lighting, professional and futuristic, ` +
+    `no text, no people faces, abstract concept art. ` +
+    `Mood: innovative, inspiring, premium investor presentation.`;
+
+  // Imagen 3 — 使用 @google/genai SDK generateImages
+  try {
+    const response = await ai.models.generateImages({
+      model: 'imagen-3.0-generate-002',
+      prompt: imagePrompt,
+      config: {
+        numberOfImages: 1,
+        aspectRatio: '16:9',
+        personGeneration: PersonGeneration.DONT_ALLOW,
+      },
+    });
+
+    const b64 = response.generatedImages?.[0]?.image?.imageBytes;
+    if (!b64) {
+      console.warn('[Imagen] No image in response:', JSON.stringify(response).slice(0, 300));
+      return null;
+    }
+
+    return `data:image/png;base64,${b64}`;
+  } catch (e) {
+    console.warn('[Imagen] generateImages failed:', e);
+    return null;
   }
 };

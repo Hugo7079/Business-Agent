@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { AnalysisResult, PersonaEvaluation, FinancialYear, RoadmapItem } from '../types';
-import { TrendingUp, Users, ShieldAlert, Target, DollarSign, BarChart3, AlertTriangle, Briefcase, User, Factory, Sword, FileDown, Loader2 } from 'lucide-react';
+import { TrendingUp, Users, ShieldAlert, Target, DollarSign, BarChart3, AlertTriangle, Briefcase, User, Factory, Sword, FileDown, Loader2, FileText } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { generatePptx } from '../services/pptxService';
+import { generatePdf } from '../services/pdfService';
+import { summarizeForSlides, generateThemeImage } from '../services/geminiService';
 
 interface Props { result: AnalysisResult; onReset: () => void; mode?: string; }
 
@@ -15,7 +17,9 @@ const getScoreClass = (score: number) => {
 
 const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
   const [isGeneratingPpt, setIsGeneratingPpt] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pptError, setPptError] = useState<string | null>(null);
+  const [pptStage, setPptStage] = useState<string>('');
 
   // 強制將 financials 每個欄位轉成純 number，防止 AI 回傳字串導致 Recharts 無法渲染
   const chartData = (result.financials || []).map(f => ({
@@ -37,12 +41,40 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
   const handleGeneratePpt = async () => {
     setIsGeneratingPpt(true);
     setPptError(null);
+    setPptStage('精簡內文中...');
     try {
-      await generatePptx(result);
+      // 第一步：用 LLM 精簡化所有投影片內文
+      const summarized = await summarizeForSlides(result);
+
+      // 第二步：根據提案實際內容用 Imagen 生成主題插圖
+      setPptStage('生成主題插圖...');
+      const themeImage = await generateThemeImage(
+        summarized.executiveSummary,
+        summarized.marketAnalysis.description
+      );
+
+      // 第三步：產生 PPTX（傳入精簡化後的內容與 AI 圖片）
+      setPptStage('組裝簡報中...');
+      await generatePptx(summarized, themeImage);
     } catch (err: any) {
       setPptError(err.message || '產生失敗，請重試');
     } finally {
       setIsGeneratingPpt(false);
+      setPptStage('');
+    }
+  };
+
+  const handleGeneratePdf = async () => {
+    setIsGeneratingPdf(true);
+    setPptError(null);
+    setPptStage('準備中...');
+    try {
+      await generatePdf(result, (stage) => setPptStage(stage));
+    } catch (err: any) {
+      setPptError(err.message || 'PDF 產生失敗，請重試');
+    } finally {
+      setIsGeneratingPdf(false);
+      setPptStage('');
     }
   };
 
@@ -63,12 +95,22 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
             <button
               className={`ppt-btn${isGeneratingPpt ? ' ppt-btn-loading' : ''}`}
               onClick={handleGeneratePpt}
-              disabled={isGeneratingPpt}
-              title="用 AI 產生投資人簡報 PPT"
+              disabled={isGeneratingPpt || isGeneratingPdf}
+              title="下載 PowerPoint 簡報"
             >
               {isGeneratingPpt
-                ? <><Loader2 size={15} className="spin-icon" /> AI 撰寫中...</>
-                : <><FileDown size={15} /> 產生 PPT 簡報</>}
+                ? <><Loader2 size={15} className="spin-icon" /> PPT 產生中...</>
+                : <><FileDown size={15} /> 下載 .pptx</>}
+            </button>
+            <button
+              className={`pdf-btn${isGeneratingPdf ? ' ppt-btn-loading' : ''}`}
+              onClick={handleGeneratePdf}
+              disabled={isGeneratingPpt || isGeneratingPdf}
+              title="下載 PDF（手機推薦）"
+            >
+              {isGeneratingPdf
+                ? <><Loader2 size={15} className="spin-icon" /> PDF 產生中...</>
+                : <><FileText size={15} /> 下載 PDF</>}
             </button>
           </div>
         </div>
@@ -78,11 +120,11 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
         <div className="ppt-error-bar">⚠ {pptError}</div>
       )}
 
-      {isGeneratingPpt && (
+      {(isGeneratingPpt || isGeneratingPdf) && pptStage && (
         <div className="ppt-progress-bar">
           <div className="ppt-progress-inner">
             <Loader2 size={18} className="spin-icon" />
-            <span>正在產生 PowerPoint 簡報，請稍候...</span>
+            <span>{pptStage}</span>
           </div>
         </div>
       )}
@@ -224,21 +266,33 @@ const AnalysisDashboard: React.FC<Props> = ({ result, onReset, mode }) => {
         <div className="ppt-cta-left">
           <FileDown size={28} style={{color:'#3b82f6'}} />
           <div>
-            <div className="ppt-cta-title">下載投資人簡報</div>
+            <div className="ppt-cta-title">下載簡報</div>
             <div className="ppt-cta-sub">
-              一鍵產生完整 10 頁深色風格 PowerPoint 簡報，包含封面、執行摘要、市場分析、財務預測、競爭態勢、路線圖、風險評估、董事會評分與最終裁決。直接下載 .pptx，無需額外工具。
+              <strong style={{color:'#60a5fa'}}>.pptx</strong> — 深色風格 10 頁投資人簡報，適合桌機開啟與演示。<br/>
+              <strong style={{color:'#34d399'}}>.pdf</strong> — pdf版本報告，避免跑版，適合手機查閱與分享。
             </div>
           </div>
         </div>
-        <button
-          className={`ppt-btn ppt-btn-large${isGeneratingPpt ? ' ppt-btn-loading' : ''}`}
-          onClick={handleGeneratePpt}
-          disabled={isGeneratingPpt}
-        >
-          {isGeneratingPpt
-            ? <><Loader2 size={18} className="spin-icon" /> 產生中...</>
-            : <><FileDown size={18} /> 下載 .pptx 簡報</>}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <button
+            className={`ppt-btn ppt-btn-large${isGeneratingPpt ? ' ppt-btn-loading' : ''}`}
+            onClick={handleGeneratePpt}
+            disabled={isGeneratingPpt || isGeneratingPdf}
+          >
+            {isGeneratingPpt
+              ? <><Loader2 size={18} className="spin-icon" /> 產生中...</>
+              : <><FileDown size={18} /> 下載 .pptx 簡報</>}
+          </button>
+          <button
+            className={`pdf-btn pdf-btn-large${isGeneratingPdf ? ' ppt-btn-loading' : ''}`}
+            onClick={handleGeneratePdf}
+            disabled={isGeneratingPpt || isGeneratingPdf}
+          >
+            {isGeneratingPdf
+              ? <><Loader2 size={18} className="spin-icon" /> 產生中...</>
+              : <><FileText size={18} /> 下載 PDF（手機推薦）</>}
+          </button>
+        </div>
       </div>
     </div>
   );
