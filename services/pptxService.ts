@@ -107,7 +107,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     sl.addText(`${sc}%`, { x:0.5, y:3.82, w:2.3, h:0.48, fontSize:FONT_TITLE, bold:true, color:sC, align:'center', valign:'middle' });
 
     // 封面摘要：只取第一條
-    const coverLine = r.executiveSummary.split('\n')[0] || '';
+    const execSum = r.executiveSummary || '';
+    const coverLine = (execSum || '').split('\n')[0] || '';
     sl.addText(coverLine, { x:0.5, y:4.55, w:9.0, h:0.38, fontSize:FONT_BODY, color:'94A3B8', italic:true, margin:0.02, fit: 'shrink' });
 
     sl.addShape('rect', { x:0, y:6.9, w:'100%', h:0.38, fill:{ type:'solid', color:T.card } });
@@ -129,7 +130,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     sl.addText('核心觀點', { x:MX+0.2, y:BODY_T+PAD, w:lW-0.4, h:HDR-PAD, fontSize:FONT_SUBTITLE, bold:true, color:T.accent });
 
     const bAvailH = BODY_H - HDR - 0.08;
-    sl.addText(joinBullets(r.executiveSummary.split('\n').filter(Boolean)), {
+    const execSumText = r.executiveSummary || '';
+    sl.addText(joinBullets((execSumText || '').split('\n').filter(Boolean)), {
       x:MX+0.2, y:BODY_T+HDR, w:lW-0.35, h:bAvailH,
       fontSize:FONT_BODY, color:'CBD5E1', lineSpacingMultiple:1.2, valign:'top', margin:0.02,
       fit: 'shrink'
@@ -183,7 +185,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addCard(sl, T, MX, mTop, CW, mH);
     sl.addText('市場洞察', { x:MX+0.2, y:mTop+0.1, w:CW-0.4, h:0.28, fontSize:FONT_SUBTITLE, bold:true, color:T.accent });
 
-    sl.addText(joinBullets(r.marketAnalysis.description.split('\n').filter(Boolean), '◆  '), {
+    const marketDesc = r.marketAnalysis?.description || '';
+    sl.addText(joinBullets((marketDesc || '').split('\n').filter(Boolean), '◆  '), {
       x:MX+0.2, y:mTop+mHDR, w:CW-0.4, h:mAvail,
       fontSize:FONT_BODY, color:'CBD5E1', lineSpacingMultiple:1.2, valign:'top', margin:0.02,
       fit: 'shrink'
@@ -448,9 +451,9 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addBg(sl, T); addHeader(sl, T, '最終裁決');
 
     const verdicts = [
-      { title:'激進觀點', text: r.finalVerdicts.aggressive,   color:'F97316'  },
-      { title:'平衡觀點', text: r.finalVerdicts.balanced,     color:T.accent  },
-      { title:'保守觀點', text: r.finalVerdicts.conservative, color:T.accent3 },
+      { title:'激進觀點', text: r.finalVerdicts?.aggressive || '',   color:'F97316'  },
+      { title:'平衡觀點', text: r.finalVerdicts?.balanced || '',     color:T.accent  },
+      { title:'保守觀點', text: r.finalVerdicts?.conservative || '', color:T.accent3 },
     ];
     const gap = 0.15;
     const vW  = (CW - gap*2) / 3;
@@ -466,7 +469,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       sl.addText(v.title, { x:vx+0.12, y:BODY_T+0.1, w:vW-0.24, h:0.3, fontSize:FONT_SUBTITLE, bold:true, color:v.color });
       sl.addShape('rect', { x:vx+0.12, y:BODY_T+0.43, w:0.75, h:0.025, fill:{ type:'solid', color:v.color } });
 
-      sl.addText(joinBullets(v.text.split('\n').filter(Boolean)), {
+      const vText = v.text || '';
+      sl.addText(joinBullets((vText || '').split('\n').filter(Boolean)), {
         x:vx+0.12, y:BODY_T+HDR_H, w:vW-0.24, h:availH,
         fontSize:FONT_BODY, color:'CBD5E1', lineSpacingMultiple:1.2, valign:'top', margin:0.02, fit: 'shrink'
       });
@@ -506,7 +510,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     addCard(sl, T, MX, BODY_T, cW, cH);
     sl.addText('持續迭代建議', { x:MX+0.2, y:BODY_T+0.1, w:cW-0.4, h:0.28, fontSize:FONT_SUBTITLE, bold:true, color:T.accent });
 
-    sl.addText(joinBullets(r.continueToIterate.split('\n').filter(Boolean), '◆  '), {
+    const iterateText = r.continueToIterate || ''; 
+    sl.addText(joinBullets((iterateText || '').split('\n').filter(Boolean), '◆  '), {
       x:MX+0.2, y:BODY_T+0.44, w:cW-0.4, h:cH-0.52,
       fontSize:FONT_BODY, color:'CBD5E1', lineSpacingMultiple:1.2, valign:'top', margin:0.02,
       fit: 'shrink'
