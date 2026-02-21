@@ -78,7 +78,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
   pptx.layout = 'LAYOUT_16x9';
   pptx.author = 'OmniView AI';
   pptx.title  = 'OmniView 商業提案分析報告';
-  const TOTAL = 10;
+  const TOTAL = 11;
 
   // ════ SLIDE 1 COVER ════════════════════════════════
   {
@@ -512,7 +512,7 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       fit: 'shrink'
     });
 
-    addPageNum(sl, 11, TOTAL + 1, T);
+    addPageNum(sl, 11, TOTAL, T);
   }
 
   await pptx.writeFile({ fileName: 'OmniView_商業提案報告.pptx' });
