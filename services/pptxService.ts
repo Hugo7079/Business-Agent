@@ -16,10 +16,10 @@ const CW     = W - MX * 2;    // 內容寬度 9"
 // ── 字體大小常數 ──────────────────────────────────────────────
 const FONT_TITLE    = 44;
 const FONT_SUBTITLE = 28;
-const FONT_SECTION  = 22;   // 章節小標（≤8字）
+const FONT_SECTION  = 20;   // 章節小標（≤8字）
 const FONT_BODY     = 16;    // 內文基準（>8字）↓ 從10降為9，全局減壓
 const FONT_SMALL    = 18;    // 小標籤
-const FONT_XSMALL   = 12;    // 極小（footer / 因應對策）
+const FONT_XSMALL   = 10;    // 極小（footer / 因應對策）
 const FONT_CONTENT  = 12;   // S7/S8 內容區專用（因應對策、顧慮點）
 
 /** 依字數判斷：≤8 字視為標題，>8 字視為內文 */
@@ -123,7 +123,7 @@ const bodyTextOpts = (
 // ── 主函式 ────────────────────────────────────────────────
 
 /** 建立 PptxGenJS 實例（供 PPTX 下載與 PDF 截圖共用） */
-export const buildPptxInstance = (result: AnalysisResult, themeImageDataUrl?: string | null): PptxGenJS => {
+export const buildPptxInstance = (result: AnalysisResult, themeImageDataUrl?: string | null, proposalTitle: string = ''): PptxGenJS => {
   const r = result;
   const T = detectTheme(r.executiveSummary, r.marketAnalysis.description);
   const pptx = new PptxGenJS();
@@ -150,8 +150,10 @@ export const buildPptxInstance = (result: AnalysisResult, themeImageDataUrl?: st
     sl.addShape('roundRect', { x:0.6, y:3.65, w:2.2, h:0.9, rectRadius:0.14, fill:{ type:'solid', color:T.card }, line:{ color:sC, width:1.5 } });
     sl.addText('AI 評估成功機率', { x:0.6, y:3.7, w:2.2, h:0.22, fontSize:FONT_XSMALL, color:sC, align:'center' });
     sl.addText(`${sc}%`, { x:0.6, y:3.92, w:2.2, h:0.55, fontSize:30, bold:true, color:sC, align:'center', valign:'middle' });
+    // proposal title or fallback to first sentence
     const coverLine = strip((r.executiveSummary || '').split('\n')[0] || '');
-    sl.addText(coverLine, { x:3.5, y:2.3, w:6.0, h:0.5, fontSize:13, color:'94A3B8', italic:true, shrinkText:true, valign:'middle', align:'left' });
+    const titleText = proposalTitle || coverLine;
+    sl.addText(titleText, { x:3.5, y:2.2, w:6.0, h:0.8, fontSize:48, bold:true, color:'F8FAFC', italic:false, shrinkText:true, valign:'middle', align:'left' });
     sl.addShape('rect', { x:0, y:H-0.48, w:'100%', h:0.48, fill:{ type:'solid', color:T.card } });
     sl.addText('由 OmniView AI 360° 虛擬董事會自動生成', { x:0.5, y:H-0.36, w:6, h:0.28, fontSize:FONT_XSMALL, color:'475569' });
     sl.addText('1 / 10', { x:W-1.5, y:H-0.36, w:1.0, h:0.28, fontSize:FONT_XSMALL, color:'475569', align:'right' });
@@ -195,14 +197,14 @@ export const buildPptxInstance = (result: AnalysisResult, themeImageDataUrl?: st
       const kx = MX + i*(kW+kGap);
       addCard(sl, T, kx, BODY_T, kW, KPI_H, k.color);
       sl.addShape('rect', { x:kx, y:BODY_T, w:kW, h:0.04, fill:{ type:'solid', color:k.color } });
-      sl.addText(k.label, { x:kx+0.12, y:BODY_T+0.06, w:kW-0.24, h:0.22, fontSize:FONT_SMALL, color:'94A3B8', shrinkText:true });
-      sl.addText(k.val,   { x:kx+0.12, y:BODY_T+0.3,  w:kW-0.24, h:KPI_H-0.36, fontSize:15, bold:true, color:k.color, valign:'middle', shrinkText:true });
+      sl.addText(k.label, { x:kx+0.12, y:BODY_T+0.06, w:kW-0.24, h:0.22, fontSize:FONT_BODY, color:'94A3B8', shrinkText:true });
+      sl.addText(k.val,   { x:kx+0.12, y:BODY_T+0.3,  w:kW-0.24, h:KPI_H-0.36, fontSize:14, bold:true, color:k.color, valign:'middle', shrinkText:true });
     });
     const mTop = BODY_T+KPI_H+0.18; const mH = BODY_B-mTop;
     addCard(sl, T, MX, mTop, CW, mH);
     sl.addText('市場洞察', { x:MX+0.2, y:mTop+0.1, w:CW-0.4, h:0.3, fontSize:FONT_SECTION, bold:true, color:T.accent });
     sl.addShape('rect', { x:MX+0.2, y:mTop+0.44, w:CW-0.4, h:0.01, fill:{ type:'solid', color:T.divider } });
-    sl.addText(joinBullets((r.marketAnalysis?.description||'').split('\n').filter(Boolean),'◆  '), bodyTextOpts(MX+0.2, mTop+0.52, CW-0.4, mH-0.62, { fontSize:11, lineSpacingMultiple:1.35 }));
+    sl.addText(joinBullets((r.marketAnalysis?.description||'').split('\n').filter(Boolean),'◆  '), bodyTextOpts(MX+0.2, mTop+0.52, CW-0.4, mH-0.62, { fontSize:14, lineSpacingMultiple:1.35 }));
     addFooter(sl, T, 3, TOTAL);
   }
 
@@ -372,7 +374,7 @@ export const buildPptxInstance = (result: AnalysisResult, themeImageDataUrl?: st
   return pptx;
 };
 
-export const generatePptx = async (result: AnalysisResult, themeImageDataUrl?: string | null): Promise<void> => {
-  const pptx = buildPptxInstance(result, themeImageDataUrl);
+export const generatePptx = async (result: AnalysisResult, themeImageDataUrl?: string | null, proposalTitle: string = ''): Promise<void> => {
+  const pptx = buildPptxInstance(result, themeImageDataUrl, proposalTitle);
   await pptx.writeFile({ fileName: 'OmniView_商業提案報告.pptx' });
 };

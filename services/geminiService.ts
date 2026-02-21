@@ -551,3 +551,21 @@ export const generateThemeImage = async (
     return null;
   }
 };
+
+// 新增：根據執行摘要生成一個簡短有力的提案標題
+export const generateProposalTitle = async (executiveSummary: string): Promise<string> => {
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `請根據下列執行摘要為此商業提案取一個簡短有力的標題，最多10個中文字，只回傳標題本身。
+執行摘要：${executiveSummary}`;
+  try {
+    const resp = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { responseMimeType: 'text/plain' },
+    });
+    return resp.text?.trim() || '商業提案';
+  } catch (error) {
+    handleApiError(error);
+  }
+};
