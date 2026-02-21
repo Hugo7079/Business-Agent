@@ -155,7 +155,7 @@ export const parseBusinessIdea = async (
   audioBase64?: string
 ): Promise<ParsedInputResponse> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
 
   const prompt = `你是一位專業的商業分析助理。
 使用者將描述一個商業想法或提案（文字或語音）。
@@ -197,7 +197,7 @@ export const analyzeBusiness = async (
   data: BusinessInput
 ): Promise<AnalysisResult> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
 
   const prompt = `你是 OmniView，一個進階 AI 商業模擬系統。
 你的任務是模擬一場「董事會會議」，由不同 AI 角色對以下商業提案進行全方位 360° 嚴格評估。
@@ -248,91 +248,6 @@ successProbability 的評分依據：市場可行性 30% + 競爭優勢 25% + �
       },
     });
     return JSON.parse(response.text!) as AnalysisResult;
-  } catch (error) {
-    handleApiError(error);
-  }
-};
-
-export const generatePptNotebook = async (result: AnalysisResult): Promise<string> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
-  const dataJson = JSON.stringify(result, null, 2);
-
-  const prompt = `
-You are a world-class Python developer and presentation designer. 
-Generate a COMPLETE, RUNNABLE Python script that creates a stunning investor-grade PowerPoint (.pptx).
-
-The script will be run in a Jupyter Notebook environment. ALL text content MUST be in Traditional Chinese (繁體中文).
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ARCHITECTURE — THREE TYPES OF VISUALS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-TYPE A — AI-GENERATED IMAGES (use google-generativeai with imagen-3.0-generate-002):
-  Use this for: slide backgrounds, hero illustrations, conceptual images.
-  Method:
-    import google.generativeai as genai
-    from google.generativeai.types import GenerateImagesConfig
-    import base64, io
-    client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY',''))
-    response = client.models.generate_images(
-        model='imagen-3.0-generate-002',
-        prompt='...',
-        config=GenerateImagesConfig(number_of_images=1, aspect_ratio="16:9", output_mime_type='image/png')
-    )
-    img_bytes = base64.b64decode(response.generated_images[0].image.image_bytes)
-  Wrap every Imagen call in try/except — if it fails, fall back to a matplotlib gradient background.
-
-TYPE B — MATPLOTLIB CHARTS (only for data/numbers):
-  Financial bar charts, risk scatter, persona radar, roadmap gantt.
-  Dark bg (#1e293b), white text, dpi=150, save to BytesIO.
-  plt.rcParams['font.family'] = ['Arial Unicode MS', 'PingFang TC', 'Heiti TC', 'sans-serif']
-
-TYPE C — PYTHON-PPTX TABLES (only for structured comparison):
-  Competitive landscape, roadmap milestones.
-  Dark header (#1e3a5f), alternating rows (#1e293b / #0f172a), white text.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SLIDE STRUCTURE (10 slides):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SLIDE 1 — COVER: TYPE A bg (dark space particles) + TYPE A hero (industry-matched illustration) + title/tagline/score overlay
-SLIDE 2 — EXECUTIVE SUMMARY: TYPE A bg (dark blue waves) + bullet points with ◆ + semi-transparent text card
-SLIDE 3 — MARKET OPPORTUNITY: TYPE A bg (night cityscape) + TYPE B horizontal bar chart + KPI numbers overlay
-SLIDE 4 — FINANCIAL PROJECTIONS: solid #0f172a + TYPE B grouped bar chart + TYPE C mini data table
-SLIDE 5 — COMPETITIVE LANDSCAPE: TYPE A bg (dark chess strategy) + TYPE C full-width styled table
-SLIDE 6 — STRATEGIC ROADMAP: TYPE A bg (glowing timeline nodes) + TYPE B Gantt chart
-SLIDE 7 — RISK MATRIX: solid #0f172a + TYPE B 2x2 scatter quadrant with labels
-SLIDE 8 — STAKEHOLDER PERSPECTIVES: TYPE A bg (network silhouettes) + TYPE B radar/spider chart
-SLIDE 9 — FINAL VERDICT: TYPE A bg (dramatic light rays) + 3-column text (Aggressive/Balanced/Conservative)
-SLIDE 10 — CALL TO ACTION: TYPE A hero image (industry-specific inspiring) + centered action text
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RULES:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. API key: os.environ.get('GEMINI_API_KEY', '')
-2. Always add semi-transparent dark rect behind text placed over images
-3. Slide size: 13.33 x 7.5 inches (widescreen 16:9)
-4. Font: Title=44pt, Subtitle=26pt, Body=18pt, Caption=13pt, all white
-5. Save as: OmniView_投資提案.pptx
-6. Print progress for each slide and final success message
-
-Analysis data:
-\`\`\`json
-${dataJson}
-\`\`\`
-
-Return ONLY raw Python code. No markdown fences. No explanation. Start with import statements.
-`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { thinkingConfig: { thinkingBudget: 16000 } },
-    });
-    let code = response.text?.trim() || '';
-    code = code.replace(/^```python\n?/m, '').replace(/^```\n?/m, '').replace(/\n?```$/m, '');
-    return code;
   } catch (error) {
     handleApiError(error);
   }
@@ -433,7 +348,7 @@ const slidesSummarySchema: Schema = {
 
 export const summarizeForSlides = async (result: AnalysisResult): Promise<AnalysisResult> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
 
   const prompt = `你是一位專業的投影片簡報設計師，擅長將長篇報告壓縮成投影片可用的超短文字。
 
@@ -500,9 +415,9 @@ export const generateThemeImage = async (
   marketDesc: string,
 ): Promise<string | null> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
 
-  // 先用 Gemini Flash 根據提案內容生成一句英文圖片描述
+  // 用 LLM 產生圖像主題短語
   let themeKeyword = 'modern business strategy, professional team, innovation';
   try {
     const kwResp = await ai.models.generateContent({
@@ -527,40 +442,34 @@ export const generateThemeImage = async (
     `no text, no people faces, abstract concept art. ` +
     `Mood: innovative, inspiring, premium investor presentation.`;
 
-  // 尝试使用目前可用的图片模型，若找不到则做二次尝试
-  const tryModels = ['gpt-image-1', 'imagen-3.1', 'imagen-3.0-generate-002'];
-  for (const mdl of tryModels) {
-    try {
-      const response = await ai.models.generateImages({
-        model: mdl,
-        prompt: imagePrompt,
-        config: {
-          numberOfImages: 1,
-          aspectRatio: '16:9',
-          personGeneration: PersonGeneration.DONT_ALLOW,
-        },
-      });
-
-      const b64 = response.generatedImages?.[0]?.image?.imageBytes;
-      if (!b64) {
-        console.warn('[Imagen] No image in response for model', mdl);
-        continue;
-      }
-      return `data:image/png;base64,${b64}`;
-    } catch (e: any) {
-      // 404 或其他错误时继续尝试下一个模型
-      console.warn(`[Imagen] generateImages failed for model ${mdl}:`, e);
+  // 強制使用 imagen-3.0-generate-001
+  const modelName = 'imagen-3.0-generate-001';
+  try {
+    const response = await ai.models.generateImages({
+      model: modelName,
+      prompt: imagePrompt,
+      config: {
+        numberOfImages: 1,
+        aspectRatio: '16:9',
+        personGeneration: PersonGeneration.DONT_ALLOW,
+      },
+    });
+    const b64 = response.generatedImages?.[0]?.image?.imageBytes;
+    if (!b64) {
+      console.warn('[Imagen] No image in response from', modelName, JSON.stringify(response).slice(0,300));
+      return null;
     }
+    return `data:image/png;base64,${b64}`;
+  } catch (e: any) {
+    console.warn(`[Imagen] generateImages failed for ${modelName}:`, e);
+    return null;
   }
-
-  // 所有模型皆失败
-  return null;
 };
 
 // 新增：根據執行摘要生成一個簡短有力的提案標題
 export const generateProposalTitle = async (executiveSummary: string): Promise<string> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
   const prompt = `請根據下列執行摘要為此商業提案取一個簡短有力的標題，最多10個中文字，只回傳標題本身。
 執行摘要：${executiveSummary}`;
   try {
