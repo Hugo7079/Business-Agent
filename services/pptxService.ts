@@ -11,18 +11,105 @@ const BODY_H = BODY_B - BODY_T; // = 6.28"
 
 // ── 文字工具 ──────────────────────────────────────────────
 
+const getCharW = (char: string, fontSize: number) => {
+  const ptPerInch = 72;
+  // 稍微加大寬度估算，確保絕對不會超出 (1 for 中文, 1 for 英文)
+  return char.charCodeAt(0) > 255 ? (fontSize / ptPerInch) * 1 : (fontSize / ptPerInch) * 1;
+};
+
 /**
- * 把 \n 分隔文字切行，並根據可用高度與字體大小計算最大行數後截斷。
- * fontSize 單位 pt，行高係數 lineH（預設 1.4）。
+ * 動態計算適合的字體大小，若縮到最小字體仍放不下則截斷文字。
  */
-const fitLines = (text: string, availH: number, fontSize: number, lineH = 1.4): string[] => {
-  if (!text) return ['—'];
-  const ptPerInch  = 72;
-  const lineInches = (fontSize / ptPerInch) * lineH;
-  const maxLines   = Math.max(1, Math.floor(availH / lineInches));
-  const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
-  const kept  = lines.slice(0, maxLines);
-  return kept.length ? kept : ['—'];
+const autoFitText = (
+  text: string,
+  boxW: number,
+  boxH: number,
+  maxFontSize: number,
+  minFontSize: number = 20, // 提高最小字體限制
+  lineH: number = 1,      // 縮小行距
+  margin: number = 0.02,    // 縮小邊距
+  hasBullet: boolean = true
+): { text: string, fontSize: number } => {
+  if (!text) return { text: '—', fontSize: maxFontSize };
+  
+  const availW = Math.max(0.1, boxW - margin * 2);
+  const availH = Math.max(0.1, boxH - margin * 2);
+  const ptPerInch = 72;
+  const paragraphs = text.split('\n').map(s => s.trim()).filter(Boolean);
+
+  let bestFont = maxFontSize;
+
+  for (let f = maxFontSize; f >= minFontSize; f -= 0.5) {
+    const lineInches = (f / ptPerInch) * lineH;
+    const maxLines = Math.max(1, Math.floor(availH / lineInches));
+    const bulletW = hasBullet ? (f / ptPerInch) * 2.5 : 0;
+
+    let totalLines = 0;
+    let fits = true;
+
+    for (const p of paragraphs) {
+      let pLines = 1;
+      let currentW = bulletW;
+      for (let i = 0; i < p.length; i++) {
+        const cw = getCharW(p[i], f);
+        if (currentW + cw > availW) {
+          pLines++;
+          currentW = cw;
+        } else {
+          currentW += cw;
+        }
+      }
+      totalLines += pLines;
+      if (totalLines > maxLines) {
+        fits = false;
+        break;
+      }
+    }
+
+    if (fits) {
+      return { text: paragraphs.join('\n'), fontSize: f };
+    }
+  }
+
+  // 如果連 minFontSize 都塞不下，就用 minFontSize 進行截斷
+  bestFont = minFontSize;
+  const lineInches = (bestFont / ptPerInch) * lineH;
+  const maxLines = Math.max(1, Math.floor(availH / lineInches));
+  const bulletW = hasBullet ? (bestFont / ptPerInch) * 2.5 : 0;
+
+  const kept: string[] = [];
+  let currentLines = 0;
+
+  for (const p of paragraphs) {
+    let pLines = 1;
+    let currentW = bulletW;
+    let allowedStr = '';
+
+    for (let i = 0; i < p.length; i++) {
+      const cw = getCharW(p[i], bestFont);
+      if (currentW + cw > availW) {
+        pLines++;
+        currentW = cw;
+      } else {
+        currentW += cw;
+      }
+
+      if (currentLines + pLines > maxLines) {
+        if (allowedStr.length > 2) {
+          kept.push(allowedStr.slice(0, -2) + '..');
+        } else {
+          kept.push(allowedStr);
+        }
+        return { text: kept.join('\n'), fontSize: bestFont };
+      }
+      allowedStr += p[i];
+    }
+    kept.push(allowedStr);
+    currentLines += pLines;
+    if (currentLines >= maxLines) break;
+  }
+
+  return { text: kept.join('\n'), fontSize: bestFont };
 };
 
 /** 把行陣列合併成一個 string，供整塊文字框使用 */
@@ -69,11 +156,11 @@ const addBg = (sl: PptxGenJS.Slide, T: Theme) => {
   sl.addShape('rect', { x:0, y:0, w:'100%', h:0.05, fill:{ type:'solid', color:T.accent } });
 };
 const addHeader = (sl: PptxGenJS.Slide, T: Theme, title: string) => {
-  sl.addText(title, { x:MX, y:0.1, w:8, h:0.48, fontSize:19, bold:true, color:'F8FAFC', fontFace:'Arial' });
+  sl.addText(title, { x:MX, y:0.1, w:8, h:0.48, fontSize:28, bold:true, color:'F8FAFC', fontFace:'Arial' });
   sl.addShape('rect', { x:MX, y:0.6, w:0.85, h:0.03, fill:{ type:'solid', color:T.accent } });
 };
 const addPageNum = (sl: PptxGenJS.Slide, n: number, total: number, T: Theme) =>
-  sl.addText(`${n} / ${total}`, { x:8.6, y:7.22, w:0.8, h:0.2, fontSize:7.5, color:T.divider, align:'right' });
+  sl.addText(`${n} / ${total}`, { x:8.6, y:7.22, w:0.8, h:0.2, fontSize:14, color:T.divider, align:'right' });
 const addCard = (sl: PptxGenJS.Slide, T: Theme, x:number, y:number, w:number, h:number, border?: string) =>
   sl.addShape('roundRect', { x, y, w, h, rectRadius:0.1,
     fill:{ type:'solid', color:T.card }, line:{ color:border||T.divider, width:0.75 } });
@@ -100,30 +187,31 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     sl.addShape('ellipse', { x:-1,  y:5.0,  w:3.0, h:3.0, fill:{ type:'solid', color:T.card } });
 
     sl.addShape('roundRect', { x:0.5, y:0.3, w:0.55, h:0.55, rectRadius:0.08, fill:{ type:'solid', color:T.accent } });
-    sl.addText('OV',          { x:0.5,  y:0.3,  w:0.55, h:0.55, fontSize:13, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
-    sl.addText('OmniView AI', { x:1.15, y:0.35, w:3,    h:0.45, fontSize:15, bold:true, color:'F8FAFC' });
+    sl.addText('OV',          { x:0.5,  y:0.3,  w:0.55, h:0.55, fontSize:18, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
+    sl.addText('OmniView AI', { x:1.15, y:0.35, w:3,    h:0.45, fontSize:20, bold:true, color:'F8FAFC' });
 
     sl.addShape('roundRect', { x:0.5, y:1.05, w:3.0, h:0.32, rectRadius:0.16,
       fill:{ type:'solid', color:T.accent+'28' }, line:{ color:T.accent+'60', width:0.75 } });
-    sl.addText(T.tagline, { x:0.5, y:1.05, w:3.0, h:0.32, fontSize:8, bold:true, color:T.accent,
+    sl.addText(T.tagline, { x:0.5, y:1.05, w:3.0, h:0.32, fontSize:12, bold:true, color:T.accent,
       align:'center', valign:'middle', charSpacing:1.5 });
 
-    sl.addText('商業提案\n分析報告', { x:0.5, y:1.55, w:8.5, h:1.7, fontSize:40, bold:true, color:'F8FAFC', lineSpacingMultiple:1.1 });
+    sl.addText('商業提案\n分析報告', { x:0.5, y:1.55, w:8.5, h:1.7, fontSize:48, bold:true, color:'F8FAFC', lineSpacingMultiple:1.1 });
 
     const sc = r.successProbability;
     const sC = scoreColor(sc);
     sl.addShape('roundRect', { x:0.5, y:3.5, w:2.3, h:0.85, rectRadius:0.12,
       fill:{ type:'solid', color:sC+'22' }, line:{ color:sC, width:1.5 } });
-    sl.addText('AI 評估成功機率', { x:0.5, y:3.56, w:2.3, h:0.26, fontSize:8.5, color:sC, align:'center' });
-    sl.addText(`${sc}%`, { x:0.5, y:3.82, w:2.3, h:0.48, fontSize:26, bold:true, color:sC, align:'center', valign:'middle' });
+    sl.addText('AI 評估成功機率', { x:0.5, y:3.56, w:2.3, h:0.26, fontSize:12, color:sC, align:'center' });
+    sl.addText(`${sc}%`, { x:0.5, y:3.82, w:2.3, h:0.48, fontSize:32, bold:true, color:sC, align:'center', valign:'middle' });
 
     // 封面摘要：只取第一條
-    const coverLine = fitLines(r.executiveSummary, 0.38, 11)[0];
-    sl.addText(coverLine, { x:0.5, y:4.55, w:9.0, h:0.38, fontSize:11, color:'94A3B8', italic:true });
+    const coverFit = autoFitText(r.executiveSummary, 9.0, 0.38, 20, 16, 1.1, 0.02, false);
+    const coverLine = coverFit.text.split('\n')[0];
+    sl.addText(coverLine, { x:0.5, y:4.55, w:9.0, h:0.38, fontSize:coverFit.fontSize, color:'94A3B8', italic:true, margin:0.02 });
 
     sl.addShape('rect', { x:0, y:6.9, w:'100%', h:0.38, fill:{ type:'solid', color:T.card } });
     sl.addText('由 OmniView AI 360° 虛擬董事會自動生成',
-      { x:0.5, y:6.93, w:6, h:0.28, fontSize:8.5, color:'475569' });
+      { x:0.5, y:6.93, w:6, h:0.28, fontSize:12, color:'475569' });
     addPageNum(sl, 1, TOTAL, T);
   }
 
@@ -137,13 +225,14 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     const HDR  = 0.48;   // 卡片內 header 高度
     const PAD  = 0.12;
     addCard(sl, T, MX, BODY_T, lW, BODY_H);
-    sl.addText('核心觀點', { x:MX+0.2, y:BODY_T+PAD, w:lW-0.4, h:HDR-PAD, fontSize:10.5, bold:true, color:T.accent });
+    sl.addText('核心觀點', { x:MX+0.2, y:BODY_T+PAD, w:lW-0.4, h:HDR-PAD, fontSize:24, bold:true, color:T.accent });
 
     const bAvailH = BODY_H - HDR - 0.08;
-    const bLines  = fitLines(r.executiveSummary, bAvailH, 11);
-    sl.addText(joinBullets(bLines), {
+    const bFit = autoFitText(r.executiveSummary, lW-0.35, bAvailH, 24, 18, 1.2, 0.02, true);
+    sl.addText(joinBullets(bFit.text.split('\n')), {
       x:MX+0.2, y:BODY_T+HDR, w:lW-0.35, h:bAvailH,
-      fontSize:11, color:'CBD5E1', lineSpacingMultiple:1.45, valign:'top',
+      fontSize:bFit.fontSize, color:'CBD5E1', lineSpacingMultiple:1.2, valign:'top', margin:0.02,
+      fit: 'shrink'
     });
 
     // 右：KPI 卡 ×3
@@ -160,8 +249,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       const ky = BODY_T + i * (kH + kGap);
       addCard(sl, T, kX, ky, kW, kH, k.color+'55');
       sl.addShape('rect', { x:kX, y:ky, w:0.04, h:kH, fill:{ type:'solid', color:k.color } });
-      sl.addText(k.label, { x:kX+0.14, y:ky+0.12, w:kW-0.2, h:0.26, fontSize:9,  color:'94A3B8' });
-      sl.addText(k.val,   { x:kX+0.14, y:ky+0.44, w:kW-0.2, h:kH-0.54, fontSize:12, bold:true, color:k.color, valign:'top' });
+      sl.addText(k.label, { x:kX+0.14, y:ky+0.12, w:kW-0.2, h:0.26, fontSize:16,  color:'94A3B8' });
+      sl.addText(k.val,   { x:kX+0.14, y:ky+0.44, w:kW-0.2, h:kH-0.54, fontSize:20, bold:true, color:k.color, valign:'top' });
     });
 
     addPageNum(sl, 2, TOTAL, T);
@@ -183,8 +272,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       const kx = MX + i * (kW + 0.1);
       addCard(sl, T, kx, BODY_T, kW, KPI_H, k.color+'66');
       sl.addShape('rect', { x:kx, y:BODY_T, w:kW, h:0.04, fill:{ type:'solid', color:k.color } });
-      sl.addText(k.label, { x:kx+0.12, y:BODY_T+0.1,  w:kW-0.24, h:0.28, fontSize:9.5, color:'94A3B8' });
-      sl.addText(k.val,   { x:kx+0.12, y:BODY_T+0.44, w:kW-0.24, h:KPI_H-0.54, fontSize:13, bold:true, color:k.color, valign:'top' });
+      sl.addText(k.label, { x:kx+0.12, y:BODY_T+0.1,  w:kW-0.24, h:0.28, fontSize:16, color:'94A3B8' });
+      sl.addText(k.val,   { x:kx+0.12, y:BODY_T+0.44, w:kW-0.24, h:KPI_H-0.54, fontSize:20, bold:true, color:k.color, valign:'top' });
     });
 
     const mTop   = BODY_T + KPI_H + 0.15;
@@ -192,12 +281,13 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     const mHDR   = 0.44;
     const mAvail = mH - mHDR - 0.08;
     addCard(sl, T, MX, mTop, CW, mH);
-    sl.addText('市場洞察', { x:MX+0.2, y:mTop+0.1, w:CW-0.4, h:0.28, fontSize:10.5, bold:true, color:T.accent });
+    sl.addText('市場洞察', { x:MX+0.2, y:mTop+0.1, w:CW-0.4, h:0.28, fontSize:24, bold:true, color:T.accent });
 
-    const mLines = fitLines(r.marketAnalysis.description, mAvail, 11);
-    sl.addText(joinBullets(mLines, '◆  '), {
+    const mFit = autoFitText(r.marketAnalysis.description, CW-0.4, mAvail, 24, 18, 1.2, 0.02, true);
+    sl.addText(joinBullets(mFit.text.split('\n'), '◆  '), {
       x:MX+0.2, y:mTop+mHDR, w:CW-0.4, h:mAvail,
-      fontSize:11, color:'CBD5E1', lineSpacingMultiple:1.45, valign:'top',
+      fontSize:mFit.fontSize, color:'CBD5E1', lineSpacingMultiple:1.2, valign:'top', margin:0.02,
+      fit: 'shrink'
     });
 
     addPageNum(sl, 3, TOTAL, T);
@@ -215,17 +305,17 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
 
     const fHdr: PptxGenJS.TableCell[] = ['年度','營收','成本','淨利'].map(t => ({
       text: t,
-      options: { bold:true, color:'FFFFFF', fill:{ color:T.headerBg }, fontSize:11.5, align:'center' as const },
+      options: { bold:true, color:'FFFFFF', fill:{ color:T.headerBg }, fontSize:18, align:'center' as const },
     }));
     const fRows: PptxGenJS.TableCell[][] = [fHdr];
     finData.forEach((f, i) => {
       const bg  = i%2===0 ? T.card : T.bg;
       const pft = Number(f.profit)||0;
       fRows.push([
-        { text: f.year ?? '—',              options:{ color:'F8FAFC',                        fill:{color:bg}, fontSize:11.5, align:'center' as const, bold:true } },
-        { text: fmt(Number(f.revenue)||0),  options:{ color:T.accent,                        fill:{color:bg}, fontSize:11.5, align:'center' as const, bold:true } },
-        { text: fmt(Number(f.costs)||0),    options:{ color:'94A3B8',                        fill:{color:bg}, fontSize:11.5, align:'center' as const } },
-        { text: fmt(pft),                   options:{ color: pft>=0 ? T.accent2 : 'EF4444', fill:{color:bg}, fontSize:11.5, align:'center' as const, bold:true } },
+        { text: f.year ?? '—',              options:{ color:'F8FAFC',                        fill:{color:bg}, fontSize:18, align:'center' as const, bold:true } },
+        { text: fmt(Number(f.revenue)||0),  options:{ color:T.accent,                        fill:{color:bg}, fontSize:18, align:'center' as const, bold:true } },
+        { text: fmt(Number(f.costs)||0),    options:{ color:'94A3B8',                        fill:{color:bg}, fontSize:18, align:'center' as const } },
+        { text: fmt(pft),                   options:{ color: pft>=0 ? T.accent2 : 'EF4444', fill:{color:bg}, fontSize:18, align:'center' as const, bold:true } },
       ]);
     });
     sl.addTable(fRows, {
@@ -239,9 +329,9 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     const barH   = BODY_B - barTop;
     if (barH >= 0.9) {
       addCard(sl, T, MX, barTop, CW, barH);
-      sl.addText('營收趨勢', { x:MX+0.2, y:barTop+0.1, w:3, h:0.24, fontSize:9.5, bold:true, color:T.accent });
+      sl.addText('營收趨勢', { x:MX+0.2, y:barTop+0.1, w:3, h:0.24, fontSize:20, bold:true, color:T.accent });
       sl.addText(`損益平衡：${r.breakEvenPoint}`,
-        { x:4.5, y:barTop+0.1, w:4.75, h:0.24, fontSize:9.5, color:T.accent2, align:'right' });
+        { x:4.5, y:barTop+0.1, w:4.75, h:0.24, fontSize:18, color:T.accent2, align:'right' });
 
       const maxRev  = Math.max(...finData.map(f=>Number(f.revenue)||0), 1);
       const barSX   = 1.5;
@@ -252,13 +342,13 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
         const bw  = Math.max(rev/maxRev*barMaxW, 0.12);
         const by  = barTop + 0.38 + i * rowH2;
         if (by + rowH2 > BODY_B - 0.05) return;
-        sl.addText(f.year ?? '—', { x:0.55, y:by, w:0.85, h:rowH2, fontSize:8.5, color:'94A3B8', valign:'middle' });
+        sl.addText(f.year ?? '—', { x:0.55, y:by, w:0.85, h:rowH2, fontSize:16, color:'94A3B8', valign:'middle' });
         sl.addShape('roundRect', { x:barSX, y:by+0.04, w:bw, h:rowH2-0.08, rectRadius:0.04, fill:{ type:'solid', color:T.accent } });
         const lx = barSX+bw+0.08;
         if (lx+0.85 <= MX+CW) {
-          sl.addText(fmt(rev), { x:lx, y:by, w:0.85, h:rowH2, fontSize:8.5, color:T.accent, bold:true, valign:'middle' });
+          sl.addText(fmt(rev), { x:lx, y:by, w:0.85, h:rowH2, fontSize:16, color:T.accent, bold:true, valign:'middle' });
         } else {
-          sl.addText(fmt(rev), { x:barSX+bw-0.95, y:by, w:0.85, h:rowH2, fontSize:8.5, color:'FFFFFF', bold:true, valign:'middle' });
+          sl.addText(fmt(rev), { x:barSX+bw-0.95, y:by, w:0.85, h:rowH2, fontSize:16, color:'FFFFFF', bold:true, valign:'middle' });
         }
       });
     }
@@ -277,19 +367,18 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
 
     const cHdr: PptxGenJS.TableCell[] = ['競爭對手','優勢','劣勢'].map(t => ({
       text: t,
-      options: { bold:true, color:'FFFFFF', fill:{ color:T.headerBg }, fontSize:11.5, align:'center' as const },
+      options: { bold:true, color:'FFFFFF', fill:{ color:T.headerBg }, fontSize:18, align:'center' as const },
     }));
     const cRows: PptxGenJS.TableCell[][] = [cHdr];
+    
     comps.forEach((c, i) => {
       const bg = i%2===0 ? T.card : T.bg;
-      // 每格文字截到能放入該 rowH 的行數
-      const maxL = Math.max(1, Math.floor((rowH - 0.1) / ((10 / 72) * 1.4)));
-      const strLines = c.strength.split('\n').filter(Boolean).slice(0, maxL).join(' ');
-      const wkLines  = c.weakness.split('\n').filter(Boolean).slice(0, maxL).join(' ');
+      const strFit = autoFitText(c.strength, 3.55, rowH, 20, 16, 1.2, 0.02, false);
+      const wkFit  = autoFitText(c.weakness, 3.55, rowH, 20, 16, 1.2, 0.02, false);
       cRows.push([
-        { text: c.name,    options:{ bold:true, color:'F8FAFC', fill:{color:bg}, fontSize:11, align:'center' as const } },
-        { text: strLines,  options:{ color:T.accent2,           fill:{color:bg}, fontSize:10 } },
-        { text: wkLines,   options:{ color:'F87171',            fill:{color:bg}, fontSize:10 } },
+        { text: c.name,    options:{ bold:true, color:'F8FAFC', fill:{color:bg}, fontSize:18, align:'center' as const, margin:0.02 } },
+        { text: strFit.text,  options:{ color:T.accent2,           fill:{color:bg}, fontSize:strFit.fontSize, margin:0.02 } },
+        { text: wkFit.text,   options:{ color:'F87171',            fill:{color:bg}, fontSize:wkFit.fontSize, margin:0.02 } },
       ]);
     });
     sl.addTable(cRows, {
@@ -322,16 +411,16 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       // 序號圓點
       sl.addShape('ellipse', { x:0.49, y:iY+0.1, w:0.25, h:0.25, fill:{ type:'solid', color:T.accent } });
       sl.addText(`${i+1}`, { x:0.49, y:iY+0.1, w:0.25, h:0.25,
-        fontSize:8.5, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
+        fontSize:14, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
 
       // 標題 + 時間標籤（一行高 0.32，y 限制在 iBot 以內）
       const titleY = iY + 0.05;
       if (titleY + 0.32 <= iBot) {
-        sl.addText(item.phase, { x:0.88, y:titleY, w:3.3, h:0.3, fontSize:12, bold:true, color:T.accent });
+        sl.addText(item.phase, { x:0.88, y:titleY, w:3.3, h:0.3, fontSize:20, bold:true, color:T.accent });
         sl.addShape('roundRect', { x:4.35, y:titleY+0.02, w:1.45, h:0.25, rectRadius:0.12,
           fill:{ type:'solid', color:T.accent+'25' }, line:{ color:T.accent+'60', width:0.5 } });
         sl.addText(item.timeframe, { x:4.35, y:titleY+0.02, w:1.45, h:0.25,
-          fontSize:8.5, color:T.accent, align:'center', valign:'middle' });
+          fontSize:14, color:T.accent, align:'center', valign:'middle' });
       }
 
       // 內容卡
@@ -345,20 +434,20 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       const half    = (CW - 0.45 - 0.1) / 2;
       if (textH <= 0) return;
 
-      const pLines = fitLines(item.product,    textH, 9.5);
-      const tLines = fitLines(item.technology, textH, 9.5);
+      const pFit = autoFitText(item.product, half-0.2, textH, 18, 14, 1.2, 0.02, false);
+      const tFit = autoFitText(item.technology, half-0.2, textH, 18, 14, 1.2, 0.02, false);
 
-      sl.addText('產品', { x:1.06, y:cTop+0.06, w:half-0.2, h:labelH, fontSize:8.5, bold:true, color:T.accent2 });
-      sl.addText(pLines.join('\n'), { x:1.06, y:cTop+0.06+labelH, w:half-0.2, h:textH,
-        fontSize:9.5, color:'CBD5E1', valign:'top', lineSpacingMultiple:1.35 });
+      sl.addText('產品', { x:1.06, y:cTop+0.06, w:half-0.2, h:labelH, fontSize:16, bold:true, color:T.accent2, margin:0.02 });
+      sl.addText(pFit.text, { x:1.06, y:cTop+0.06+labelH, w:half-0.2, h:textH,
+        fontSize:pFit.fontSize, color:'CBD5E1', valign:'top', lineSpacingMultiple:1.2, margin:0.02, fit: 'shrink' });
 
       sl.addShape('rect', { x:0.88+half+0.05, y:cTop+0.06, w:0.02, h:cH-0.12,
         fill:{ type:'solid', color:T.divider } });
 
       const rx = 0.88 + half + 0.12;
-      sl.addText('技術', { x:rx, y:cTop+0.06, w:half-0.2, h:labelH, fontSize:8.5, bold:true, color:T.accent3 });
-      sl.addText(tLines.join('\n'), { x:rx, y:cTop+0.06+labelH, w:half-0.2, h:textH,
-        fontSize:9.5, color:'CBD5E1', valign:'top', lineSpacingMultiple:1.35 });
+      sl.addText('技術', { x:rx, y:cTop+0.06, w:half-0.2, h:labelH, fontSize:16, bold:true, color:T.accent3, margin:0.02 });
+      sl.addText(tFit.text, { x:rx, y:cTop+0.06+labelH, w:half-0.2, h:textH,
+        fontSize:tFit.fontSize, color:'CBD5E1', valign:'top', lineSpacingMultiple:1.2, margin:0.02, fit: 'shrink' });
     });
     addPageNum(sl, 6, TOTAL, T);
   }
@@ -390,19 +479,19 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       sl.addShape('roundRect', { x:cx+cW-0.78, y:cy+0.1, w:0.64, h:0.24, rectRadius:0.12,
         fill:{ type:'solid', color:ic+'30' }, line:{ color:ic, width:0.5 } });
       sl.addText(label, { x:cx+cW-0.78, y:cy+0.1, w:0.64, h:0.24,
-        fontSize:8.5, bold:true, color:ic, align:'center', valign:'middle' });
+        fontSize:14, bold:true, color:ic, align:'center', valign:'middle' });
 
-      sl.addText(risk.risk, { x:cx+0.14, y:cy+0.1, w:cW-0.98, h:0.28, fontSize:11, bold:true, color:'F8FAFC' });
+      sl.addText(risk.risk, { x:cx+0.14, y:cy+0.1, w:cW-0.98, h:0.28, fontSize:18, bold:true, color:'F8FAFC' });
 
       // 因應措施文字
       const mitTop = cy + 0.42;
       const mitH   = (cy + cH) - mitTop - 0.06;
       if (mitH > 0.14) {
-        const mitLines = fitLines(risk.mitigation, mitH, 8.5);
+        const mitFit = autoFitText(risk.mitigation, cW-0.26, mitH, 18, 14, 1.2, 0.02, false);
         sl.addText([
-          { text:'因應：', options:{ fontSize:8.5, color:'64748B', bold:true } },
-          { text: mitLines.join(' '), options:{ fontSize:8.5, color:'CBD5E1' } },
-        ], { x:cx+0.14, y:mitTop, w:cW-0.26, h:mitH, valign:'top' });
+          { text:'因應：', options:{ fontSize:16, color:'64748B', bold:true } },
+          { text: mitFit.text.replace(/\n/g, ' '), options:{ fontSize:mitFit.fontSize, color:'CBD5E1' } },
+        ], { x:cx+0.14, y:mitTop, w:cW-0.26, h:mitH, valign:'top', margin:0.02, fit: 'shrink' });
       }
     });
     addPageNum(sl, 7, TOTAL, T);
@@ -432,8 +521,8 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       addCard(sl, T, cx, cy, cW, cH);
       sl.addShape('rect', { x:cx, y:cy, w:cW, h:0.04, fill:{ type:'solid', color:sC } });
 
-      sl.addText(p.role, { x:cx+0.12, y:cy+0.1, w:cW-0.85, h:0.28, fontSize:11, bold:true, color:'F8FAFC' });
-      sl.addText(`${sc}`, { x:cx+cW-0.82, y:cy+0.08, w:0.68, h:0.3, fontSize:17, bold:true, color:sC, align:'right' });
+      sl.addText(p.role, { x:cx+0.12, y:cy+0.1, w:cW-0.85, h:0.28, fontSize:18, bold:true, color:'F8FAFC' });
+      sl.addText(`${sc}`, { x:cx+cW-0.82, y:cy+0.08, w:0.68, h:0.3, fontSize:24, bold:true, color:sC, align:'right' });
 
       const barFill = (cW-0.24)*(sc/100);
       sl.addShape('roundRect', { x:cx+0.12, y:cy+0.42, w:cW-0.24, h:0.055, rectRadius:0.028,
@@ -444,18 +533,19 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
       // 金句：固定高 0.44
       const quoteH = 0.44;
       const quoteY = cy + 0.54;
-      sl.addText(`"${p.keyQuote}"`, { x:cx+0.12, y:quoteY, w:cW-0.24, h:quoteH,
-        fontSize:9, italic:true, color:'94A3B8', valign:'top' });
+      const quoteFit = autoFitText(p.keyQuote, cW-0.24, quoteH, 16, 12, 1.2, 0.02, false);
+      sl.addText(`"${quoteFit.text.replace(/\n/g, ' ')}"`, { x:cx+0.12, y:quoteY, w:cW-0.24, h:quoteH,
+        fontSize:quoteFit.fontSize, italic:true, color:'94A3B8', valign:'top', margin:0.02, fit: 'shrink' });
 
       // concern：剩餘空間
       const conTop = quoteY + quoteH + 0.04;
       const conH   = (cy+cH) - conTop - 0.06;
       if (conH > 0.12) {
-        const conLines = fitLines(p.concern, conH, 8.5);
+        const conFit = autoFitText(p.concern, cW-0.24, conH, 16, 12, 1.2, 0.02, false);
         sl.addText([
-          { text:'! ', options:{ fontSize:8.5, color:'FBBF24', bold:true } },
-          { text: conLines.join(' '), options:{ fontSize:8.5, color:'CBD5E1' } },
-        ], { x:cx+0.12, y:conTop, w:cW-0.24, h:conH, valign:'top' });
+          { text:'! ', options:{ fontSize:16, color:'FBBF24', bold:true } },
+          { text: conFit.text.replace(/\n/g, ' '), options:{ fontSize:conFit.fontSize, color:'CBD5E1' } },
+        ], { x:cx+0.12, y:conTop, w:cW-0.24, h:conH, valign:'top', margin:0.02, fit: 'shrink' });
       }
     });
     addPageNum(sl, 8, TOTAL, T);
@@ -482,13 +572,13 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
 
       addCard(sl, T, vx, BODY_T, vW, vH, v.color+'55');
       sl.addShape('rect', { x:vx, y:BODY_T, w:vW, h:0.04, fill:{ type:'solid', color:v.color } });
-      sl.addText(v.title, { x:vx+0.12, y:BODY_T+0.1, w:vW-0.24, h:0.3, fontSize:12.5, bold:true, color:v.color });
+      sl.addText(v.title, { x:vx+0.12, y:BODY_T+0.1, w:vW-0.24, h:0.3, fontSize:20, bold:true, color:v.color });
       sl.addShape('rect', { x:vx+0.12, y:BODY_T+0.43, w:0.75, h:0.025, fill:{ type:'solid', color:v.color } });
 
-      const vLines = fitLines(v.text, availH, 10);
-      sl.addText(joinBullets(vLines), {
+      const vFit = autoFitText(v.text, vW-0.24, availH, 20, 16, 1.2, 0.02, true);
+      sl.addText(joinBullets(vFit.text.split('\n')), {
         x:vx+0.12, y:BODY_T+HDR_H, w:vW-0.24, h:availH,
-        fontSize:10, color:'CBD5E1', lineSpacingMultiple:1.45, valign:'top',
+        fontSize:vFit.fontSize, color:'CBD5E1', lineSpacingMultiple:1.2, valign:'top', margin:0.02, fit: 'shrink'
       });
     });
     addPageNum(sl, 9, TOTAL, T);
@@ -501,17 +591,17 @@ export const generatePptx = async (result: AnalysisResult): Promise<void> => {
     sl.addShape('rect',    { x:0,   y:0,   w:'100%', h:0.05, fill:{ type:'solid', color:T.accent } });
     sl.addShape('ellipse', { x:2.8, y:0.8, w:4.5,   h:4.5,  fill:{ type:'solid', color:T.card } });
 
-    sl.addText('下一步行動', { x:0.5, y:1.5, w:9.0, h:0.9,  fontSize:38, bold:true, color:'F8FAFC', align:'center' });
-    sl.addText(T.tagline,   { x:0.5, y:2.5, w:9.0, h:0.36, fontSize:10.5, color:T.accent, align:'center', charSpacing:2.5, bold:true });
+    sl.addText('下一步行動', { x:0.5, y:1.5, w:9.0, h:0.9,  fontSize:48, bold:true, color:'F8FAFC', align:'center' });
+    sl.addText(T.tagline,   { x:0.5, y:2.5, w:9.0, h:0.36, fontSize:16, color:T.accent, align:'center', charSpacing:2.5, bold:true });
 
     const sc = r.successProbability;
     const sC = scoreColor(sc);
     addCard(sl, T, 3.5, 3.1, 3.0, 1.5, sC);
-    sl.addText('AI 評估成功機率', { x:3.5, y:3.22, w:3.0, h:0.28, fontSize:9.5, color:'94A3B8', align:'center' });
-    sl.addText(`${sc}%`,          { x:3.5, y:3.54, w:3.0, h:0.85, fontSize:34, bold:true, color:sC, align:'center' });
+    sl.addText('AI 評估成功機率', { x:3.5, y:3.22, w:3.0, h:0.28, fontSize:16, color:'94A3B8', align:'center' });
+    sl.addText(`${sc}%`,          { x:3.5, y:3.54, w:3.0, h:0.85, fontSize:48, bold:true, color:sC, align:'center' });
 
     sl.addText('此報告由 OmniView AI 360° 虛擬董事會自動生成',
-      { x:1, y:6.55, w:8, h:0.28, fontSize:9.5, color:'475569', align:'center' });
+      { x:1, y:6.55, w:8, h:0.28, fontSize:14, color:'475569', align:'center' });
     addPageNum(sl, 10, TOTAL, T);
   }
 
