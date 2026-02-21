@@ -527,29 +527,34 @@ export const generateThemeImage = async (
     `no text, no people faces, abstract concept art. ` +
     `Mood: innovative, inspiring, premium investor presentation.`;
 
-  // Imagen 3 — 使用 @google/genai SDK generateImages
-  try {
-    const response = await ai.models.generateImages({
-      model: 'imagen-3.0-generate-002',
-      prompt: imagePrompt,
-      config: {
-        numberOfImages: 1,
-        aspectRatio: '16:9',
-        personGeneration: PersonGeneration.DONT_ALLOW,
-      },
-    });
+  // 尝试使用目前可用的图片模型，若找不到则做二次尝试
+  const tryModels = ['gpt-image-1', 'imagen-3.1', 'imagen-3.0-generate-002'];
+  for (const mdl of tryModels) {
+    try {
+      const response = await ai.models.generateImages({
+        model: mdl,
+        prompt: imagePrompt,
+        config: {
+          numberOfImages: 1,
+          aspectRatio: '16:9',
+          personGeneration: PersonGeneration.DONT_ALLOW,
+        },
+      });
 
-    const b64 = response.generatedImages?.[0]?.image?.imageBytes;
-    if (!b64) {
-      console.warn('[Imagen] No image in response:', JSON.stringify(response).slice(0, 300));
-      return null;
+      const b64 = response.generatedImages?.[0]?.image?.imageBytes;
+      if (!b64) {
+        console.warn('[Imagen] No image in response for model', mdl);
+        continue;
+      }
+      return `data:image/png;base64,${b64}`;
+    } catch (e: any) {
+      // 404 或其他错误时继续尝试下一个模型
+      console.warn(`[Imagen] generateImages failed for model ${mdl}:`, e);
     }
-
-    return `data:image/png;base64,${b64}`;
-  } catch (e) {
-    console.warn('[Imagen] generateImages failed:', e);
-    return null;
   }
+
+  // 所有模型皆失败
+  return null;
 };
 
 // 新增：根據執行摘要生成一個簡短有力的提案標題
