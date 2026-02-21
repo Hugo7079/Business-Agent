@@ -155,7 +155,7 @@ export const parseBusinessIdea = async (
   audioBase64?: string
 ): Promise<ParsedInputResponse> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `你是一位專業的商業分析助理。
 使用者將描述一個商業想法或提案（文字或語音）。
@@ -197,7 +197,7 @@ export const analyzeBusiness = async (
   data: BusinessInput
 ): Promise<AnalysisResult> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `你是 OmniView，一個進階 AI 商業模擬系統。
 你的任務是模擬一場「董事會會議」，由不同 AI 角色對以下商業提案進行全方位 360° 嚴格評估。
@@ -348,7 +348,7 @@ const slidesSummarySchema: Schema = {
 
 export const summarizeForSlides = async (result: AnalysisResult): Promise<AnalysisResult> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `你是一位專業的投影片簡報設計師，擅長將長篇報告壓縮成投影片可用的超短文字。
 
@@ -415,7 +415,7 @@ export const generateThemeImage = async (
   marketDesc: string,
 ): Promise<string | null> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
+  const ai = new GoogleGenAI({ apiKey });
 
   // 用 LLM 產生圖像主題短語
   let themeKeyword = 'modern business strategy, professional team, innovation';
@@ -469,7 +469,7 @@ export const generateThemeImage = async (
 // 新增：根據執行摘要生成一個簡短有力的提案標題
 export const generateProposalTitle = async (executiveSummary: string): Promise<string> => {
   const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey, apiFormatVersion: '2024-12-17' });
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `請根據下列執行摘要為此商業提案取一個簡短有力的標題，最多10個中文字，只回傳標題本身。
 執行摘要：${executiveSummary}`;
   try {
