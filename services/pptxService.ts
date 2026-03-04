@@ -82,7 +82,7 @@ const addBg = (sl: PptxGenJS.Slide, T: Theme) => {
 const addHeader = (sl: PptxGenJS.Slide, T: Theme, title: string) => {
   // Logo 小標 左上
   sl.addShape('roundRect', { x:MX, y:0.18, w:0.4, h:0.4, rectRadius:0.06, fill:{ type:'solid', color:T.accent } });
-  sl.addText('OV', { x:MX, y:0.18, w:0.4, h:0.4, fontSize:12, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
+  sl.addText('OV', { x:MX, y:0.18, w:0.4, h:0.4, fontSize:11, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
   // 頁面標題
   sl.addText(title, { x:MX+0.55, y:0.22, w:7.5, h:0.45, fontSize:22, bold:true, color:'F8FAFC', fontFace:'Arial', valign:'middle' });
   // 分隔線，緊貼在 BODY_T 上方
@@ -142,7 +142,7 @@ export const buildPptxInstance = (result: AnalysisResult, themeImageDataUrl?: st
     sl.addShape('ellipse', { x:6.8,  y:-1.2, w:5.5, h:5.5, fill:{ type:'solid', color:T.card } });
     sl.addShape('ellipse', { x:-1.8, y:3.2,  w:4.5, h:4.5, fill:{ type:'solid', color:T.card } });
     sl.addShape('roundRect', { x:0.6, y:0.5, w:0.55, h:0.55, rectRadius:0.08, fill:{ type:'solid', color:T.accent } });
-    sl.addText('OV',          { x:0.6, y:0.5, w:0.65, h:0.55, fontSize:17, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
+    sl.addText('OV',          { x:0.6, y:0.5, w:0.55, h:0.55, fontSize:17, bold:true, color:'FFFFFF', align:'center', valign:'middle' });
     sl.addText('OmniView AI', { x:1.25, y:0.55, w:3.5, h:0.45, fontSize:20, bold:true, color:'F8FAFC' });
     sl.addText('商業提案\n分析報告', { x:0.6, y:1.75, w:8.5, h:1.7, fontSize:32, bold:true, color:'F8FAFC', lineSpacingMultiple:1.15 });
     const sc = r.successProbability;
@@ -153,7 +153,7 @@ export const buildPptxInstance = (result: AnalysisResult, themeImageDataUrl?: st
     // proposal title or fallback to first sentence
     const coverLine = strip((r.executiveSummary || '').split('\n')[0] || '');
     const titleText = proposalTitle || coverLine;
-    sl.addText(titleText, { x:3.5, y:2.2, w:6.0, h:0.8, fontSize:48, bold:true, color:'F8FAFC', italic:false, shrinkText:true, valign:'middle', align:'left' });
+    sl.addText(titleText, { x:3.5, y:2.2, w:6.0, h:0.8, fontSize:44, bold:true, color:'F8FAFC', italic:false, shrinkText:true, valign:'middle', align:'left' });
     sl.addShape('rect', { x:0, y:H-0.48, w:'100%', h:0.48, fill:{ type:'solid', color:T.card } });
     sl.addText('由 OmniView AI 360° 虛擬董事會自動生成', { x:0.5, y:H-0.36, w:6, h:0.28, fontSize:FONT_XSMALL, color:'475569' });
     sl.addText('1 / 10', { x:W-1.5, y:H-0.36, w:1.0, h:0.28, fontSize:FONT_XSMALL, color:'475569', align:'right' });
