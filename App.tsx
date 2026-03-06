@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, AnalysisMode, BusinessInput, AnalysisResult, HistoryRecord } from './types';
+import { AppState, AnalysisMode, BusinessInput, AnalysisResult, HistoryRecord, InitialScanResult, Phase3DeepReport } from './types';
 import InputForm from './components/InputForm';
 import AnalysisDashboard from './components/AnalysisDashboard';
 import HistoryPanel from './components/HistoryPanel';
-import { analyzeBusiness } from './services/geminiService';
+import ChatFlow from './components/ChatFlow';
+import { analyzeBusiness, runInitialScan } from './services/geminiService';
 import { AlertCircle, Settings, Save, X, Clock } from 'lucide-react';
 
 const HISTORY_KEY = 'omniview_history';
@@ -13,7 +14,7 @@ const loadHistory = (): HistoryRecord[] => {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
   catch { return []; }
 };
-const saveHistory = (records: HistoryRecord[]) => {
+const saveHistoryToStorage = (records: HistoryRecord[]) => {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(records));
 };
 
@@ -41,72 +42,84 @@ const ApiKeyModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('IDLE');
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [phase3Report, setPhase3Report] = useState<Phase3DeepReport | null>(null);
+  const [initialScan, setInitialScan] = useState<InitialScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryRecord[]>(loadHistory);
   const [currentInput, setCurrentInput] = useState<BusinessInput | null>(null);
 
-  useEffect(() => { saveHistory(history); }, [history]);
+  useEffect(() => { saveHistoryToStorage(history); }, [history]);
 
-  const handleAnalyze = async (mode: AnalysisMode, data: BusinessInput) => {
-    setAppState('ANALYZING');
+  // 使用者提交提案 → 觸發初步掃描
+  const handleSubmitProposal = async (text: string, audioBase64?: string) => {
+    setAppState('SCANNING');
     setError(null);
-    setCurrentInput(data);
     try {
-      const analysisResult = await analyzeBusiness(mode, data);
+      const scan = await runInitialScan(text, audioBase64);
+      setCurrentInput(scan.extractedData);
+      setInitialScan(scan);
+      setAppState('CHATTING');
+    } catch (err: any) {
+      setError(err.message || '初步掃描失敗，請重試。');
+      setAppState('ERROR');
+    }
+  };
 
-      // 修正 successProbability：AI 有時回傳小數（0.32 代表 32%），有時回傳整數（32）
-      // 只要 < 1 就乘以 100；另外也 clamp 到 0-100 防止超出範圍
-      if (analysisResult.successProbability < 1) {
-        analysisResult.successProbability = Math.round(analysisResult.successProbability * 100);
-      }
-      analysisResult.successProbability = Math.min(100, Math.max(0, Math.round(analysisResult.successProbability)));
+  // ChatFlow 完成後：同時儲存報告到歷史，並觸發完整分析
+  const handleChatComplete = async (report: Phase3DeepReport, finalData: BusinessInput) => {
+    setCurrentInput(finalData);
+    setPhase3Report(report);
+    setAppState('COMPLETE'); // 確保跳轉到結果頁面
 
-      // 修正 financials：確保每筆資料的數字欄位都是有效數字
-      if (!Array.isArray(analysisResult.financials)) {
-        analysisResult.financials = [];
-      }
-      analysisResult.financials = analysisResult.financials.map(f => ({
-        year: f.year ?? '未知',
-        revenue: Number(f.revenue) || 0,
-        costs: Number(f.costs) || 0,
-        profit: Number(f.profit) || 0,
-      }));
+    // 背景同步呼叫 analyzeBusiness 取得財務預測、路線圖、人物誌、競爭態勢、三種觀點
+    try {
+      const fullResult = await analyzeBusiness(AnalysisMode.BUSINESS, finalData);
+      setResult(fullResult);
 
-      // 修正 personaEvaluations：確保每個 persona 有完整欄位
-      if (!Array.isArray(analysisResult.personaEvaluations)) {
-        analysisResult.personaEvaluations = [];
-      }
-      analysisResult.personaEvaluations = analysisResult.personaEvaluations.map(p => ({
-        role: p.role ?? '未知角色',
-        icon: p.icon ?? 'default',
-        perspective: p.perspective ?? '',
-        score: Math.min(100, Math.max(0, Math.round(Number(p.score) || 0))),
-        keyQuote: p.keyQuote ?? '',
-        concern: p.concern ?? '',
-      }));
-
-      setResult(analysisResult);
-      setAppState('COMPLETE');
-
+      // 儲存到歷史紀錄
       const record: HistoryRecord = {
         id: Date.now().toString(),
         createdAt: Date.now(),
-        title: data.idea.slice(0, 40) || '未命名提案',
-        input: data,
-        result: analysisResult,
+        title: finalData.idea.slice(0, 60) || '未命名提案',
+        input: finalData,
+        result: fullResult,
+        phase3Report: report,
+        finalSuccessProbability: fullResult.successProbability,
       };
       setHistory(prev => [record, ...prev].slice(0, MAX_HISTORY));
-    } catch (err: any) {
-      setError(err.message || '模擬過程中發生意外錯誤。');
-      setAppState('ERROR');
+    } catch {
+      // analyzeBusiness 失敗不影響主報告顯示，僅無法儲存完整歷史
+      const record: HistoryRecord = {
+        id: Date.now().toString(),
+        createdAt: Date.now(),
+        title: finalData.idea.slice(0, 60) || '未命名提案',
+        input: finalData,
+        result: {
+          successProbability: 0,
+          executiveSummary: '',
+          marketAnalysis: { size: '', growthRate: '', description: '' },
+          competitors: [],
+          roadmap: [],
+          financials: [],
+          breakEvenPoint: '',
+          risks: [],
+          personaEvaluations: [],
+          teamAnalysis: '',
+          finalVerdicts: { aggressive: '', balanced: '', conservative: '' },
+          continueToIterate: '',
+        },
+        phase3Report: report,
+      };
+      setHistory(prev => [record, ...prev].slice(0, MAX_HISTORY));
     }
   };
 
   const handleLoadHistory = (record: HistoryRecord) => {
     setResult(record.result);
     setCurrentInput(record.input);
+    setPhase3Report(record.phase3Report ?? null);
     setAppState('COMPLETE');
   };
 
@@ -114,11 +127,16 @@ const App: React.FC = () => {
     setHistory(prev => prev.filter(r => r.id !== id));
   };
 
-  const handleClearHistory = () => {
-    setHistory([]);
-  };
+  const handleClearHistory = () => { setHistory([]); };
 
-  const handleReset = () => { setResult(null); setError(null); setCurrentInput(null); setAppState('IDLE'); };
+  const handleReset = () => {
+    setResult(null);
+    setInitialScan(null);
+    setPhase3Report(null);
+    setError(null);
+    setCurrentInput(null);
+    setAppState('IDLE');
+  };
 
   return (
     <div className="app-bg">
@@ -157,23 +175,35 @@ const App: React.FC = () => {
         </header>
 
         <main>
-          {appState === 'IDLE' && <InputForm onAnalyze={handleAnalyze} isLoading={false} />}
-
-          {appState === 'ANALYZING' && (
-            <>
-              <InputForm onAnalyze={handleAnalyze} isLoading={true} />
-              <div className="loading-overlay">
-                <div className="spinner">
-                  <div className="spin-ring spin-ring-1" />
-                  <div className="spin-ring spin-ring-2" />
-                  <div className="spin-ring spin-ring-3" />
-                </div>
-                <h2 className="loading-title">OmniView 董事會正在開會</h2>
-                <p className="loading-sub">正在模擬投資人、競爭對手和客戶的觀點，運算市場數據並評估風險...</p>
-              </div>
-            </>
+          {/* IDLE：輸入提案 */}
+          {appState === 'IDLE' && (
+            <InputForm onSubmitProposal={handleSubmitProposal} isLoading={false} />
           )}
 
+          {/* SCANNING：初步掃描 loading */}
+          {appState === 'SCANNING' && (
+            <div className="loading-overlay" style={{ position: 'relative', padding: '6rem 0' }}>
+              <div className="spinner">
+                <div className="spin-ring spin-ring-1" />
+                <div className="spin-ring spin-ring-2" />
+                <div className="spin-ring spin-ring-3" />
+              </div>
+              <h2 className="loading-title">OmniView 正在掃描你的提案</h2>
+              <p className="loading-sub">分析市場、識別競爭對手、評估成功機率...</p>
+            </div>
+          )}
+
+          {/* CHATTING：初步結果 + 互動補充 */}
+          {appState === 'CHATTING' && initialScan && (
+            <ChatFlow
+              initialScan={initialScan}
+              fullResult={result}
+              onComplete={handleChatComplete}
+              onReset={handleReset}
+            />
+          )}
+
+          {/* ERROR */}
           {appState === 'ERROR' && (
             <div className="error-box">
               <div className="error-icon"><AlertCircle size={48} /></div>
@@ -186,8 +216,27 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {appState === 'COMPLETE' && result && (
-            <AnalysisDashboard result={result} onReset={handleReset} />
+          {/* COMPLETE：從對話完成或歷史載入的完整報告 */}
+          {appState === 'COMPLETE' && (phase3Report || result) && (
+            <AnalysisDashboard
+              result={result || {
+                successProbability: phase3Report?.radarDimensions[0]?.selfScore || 0,
+                executiveSummary: phase3Report?.keyRecommendation || '',
+                marketAnalysis: { size: phase3Report?.marketSize.tam || '', growthRate: '', description: phase3Report?.marketSize.description || '' },
+                competitors: [],
+                roadmap: [],
+                financials: [],
+                breakEvenPoint: '',
+                risks: [],
+                personaEvaluations: [],
+                teamAnalysis: '',
+                finalVerdicts: { aggressive: '', balanced: '', conservative: '' },
+                continueToIterate: phase3Report?.continueToIterate || '',
+              } as AnalysisResult}
+              onReset={handleReset}
+              sourceInput={currentInput ?? undefined}
+              phase3Report={phase3Report}
+            />
           )}
         </main>
 

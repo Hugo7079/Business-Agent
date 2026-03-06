@@ -1,31 +1,48 @@
 import React, { useState, useRef } from 'react';
-import { AnalysisMode, BusinessInput } from '../types';
-import { ArrowRight, Loader2, Mic, StopCircle, Sparkles, PenTool } from 'lucide-react';
-import { parseBusinessIdea } from '../services/geminiService';
+import { ArrowRight, Loader2, Mic, StopCircle, Sparkles, Paperclip, X, FileText, Image, File } from 'lucide-react';
+import { parseFileInput } from '../services/geminiService';
 
 interface Props {
-  onAnalyze: (mode: AnalysisMode, data: BusinessInput) => void;
+  onSubmitProposal: (text: string, audioBase64?: string) => void;
   isLoading: boolean;
 }
 
-const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
-  const [inputMethod, setInputMethod] = useState<'quick' | 'manual'>('quick');
-  const [isProcessingInput, setIsProcessingInput] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+type InputTab = 'quick' | 'file';
+
+const ACCEPTED_TYPES = [
+  'application/pdf',
+  'image/png', 'image/jpeg', 'image/webp', 'image/gif',
+  'text/plain',
+];
+const ACCEPTED_EXTENSIONS = '.pdf,.png,.jpg,.jpeg,.webp,.gif,.txt';
+
+const fileTypeIcon = (mime: string) => {
+  if (mime === 'application/pdf') return <FileText size={18} style={{ color: '#f87171' }} />;
+  if (mime.startsWith('image/')) return <Image size={18} style={{ color: '#34d399' }} />;
+  return <File size={18} style={{ color: '#94a3b8' }} />;
+};
+
+const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+  reader.onerror = reject;
+  reader.readAsDataURL(blob);
+});
+
+const InputForm: React.FC<Props> = ({ onSubmitProposal, isLoading }) => {
+  const [inputMethod, setInputMethod] = useState<InputTab>('quick');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [quickText, setQuickText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const [formData, setFormData] = useState<BusinessInput>({
-    idea: '',
-    marketData: '',
-    productDetails: '',
-    painPoints: '',
-    targetConsumer: '',
-    financialContext: '',
-  });
+  // File upload state
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Recording ──
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -44,49 +61,61 @@ const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
       setIsRecording(false);
       mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
       mediaRecorderRef.current.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await handleProcessInput(blob);
+        const b64 = await blobToBase64(new Blob(audioChunksRef.current, { type: 'audio/webm' }));
+        onSubmitProposal('', b64);
       };
     }
   };
 
-  const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  // ── Quick submit ──
+  const handleQuickSubmit = () => {
+    if (!quickText.trim()) return;
+    onSubmitProposal(quickText.trim());
+  };
 
-  const handleProcessInput = async (audioBlob?: Blob) => {
-    if (!quickText.trim() && !audioBlob) return;
-    setIsProcessingInput(true);
-    setFeedback(null);
+  // ── File handling ──
+  const handleFileSelect = (file: File) => {
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      alert('不支援的檔案格式。請上傳 PDF、圖片（PNG/JPG/WEBP/GIF）或純文字（TXT）檔案。');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      alert('檔案大小不能超過 20MB。');
+      return;
+    }
+    setUploadedFile(file);
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file);
+    e.target.value = '';
+  };
+
+  const handleProcessFile = async () => {
+    if (!uploadedFile) return;
+    setIsProcessingFile(true);
     try {
-      const audioBase64 = audioBlob ? await blobToBase64(audioBlob) : undefined;
-      const result = await parseBusinessIdea(AnalysisMode.BUSINESS, quickText, audioBase64);
-      setFormData(result.data as BusinessInput);
-      setFeedback(result.feedback);
-      setInputMethod('manual');
+      const b64 = await blobToBase64(uploadedFile);
+      const result = await parseFileInput(uploadedFile.name, uploadedFile.type, b64);
+      // Use the parsed idea text as the proposal text
+      const text = (result.data as any).idea || JSON.stringify(result.data);
+      onSubmitProposal(text);
     } catch (err: any) {
-      alert(err.message || '輸入處理失敗，請重試。');
+      alert(err.message || '檔案解析失敗，請重試。');
     } finally {
-      setIsProcessingInput(false);
+      setIsProcessingFile(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onAnalyze(AnalysisMode.BUSINESS, formData);
-  };
-
-  const fields: { key: keyof BusinessInput; label: string; placeholder: string }[] = [
-    { key: 'idea',            label: '核心想法',          placeholder: '用一兩句話描述您的商業提案核心...' },
-    { key: 'marketData',      label: '市場資料與趨勢',     placeholder: '市場規模、CAGR、主要趨勢...' },
-    { key: 'productDetails',  label: '產品或服務細節',     placeholder: '您的產品是什麼？核心功能或服務內容...' },
-    { key: 'painPoints',      label: '市場痛點',           placeholder: '目前市場缺少什麼？您解決了什麼問題...' },
-    { key: 'targetConsumer',  label: '目標客群',           placeholder: '誰會使用您的產品？人口統計、行為特徵...' },
-    { key: 'financialContext', label: '財務背景',          placeholder: '預算、預期營收、現有資金狀況...' },
-  ];
+  const busy = isLoading || isProcessingFile;
 
   return (
     <div className="form-wrapper">
@@ -99,17 +128,19 @@ const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
         <button onClick={() => setInputMethod('quick')} className={`tab-btn ${inputMethod === 'quick' ? 'active' : ''}`}>
           <Sparkles size={16} /> AI 快速輸入
         </button>
-        <button onClick={() => setInputMethod('manual')} className={`tab-btn ${inputMethod === 'manual' ? 'active' : ''}`}>
-          <PenTool size={16} /> 詳細表單
+        <button onClick={() => setInputMethod('file')} className={`tab-btn ${inputMethod === 'file' ? 'active' : ''}`}>
+          <Paperclip size={16} /> 上傳檔案
         </button>
       </div>
 
       <div className="form-card">
+
+        {/* ── Quick Input ── */}
         {inputMethod === 'quick' && (
           <div className="quick-input-section">
             <div className="quick-heading">
               <h2>描述您的商業想法</h2>
-              <p>無論是新創、品牌提案、產品計畫，直接說或打出來，AI 會自動整理成完整的分析表單。</p>
+              <p>無論是新創、品牌提案、產品計畫，直接說或打出來，AI 會立即掃描並開始深度對話分析。</p>
             </div>
             <div className="textarea-wrap">
               <textarea
@@ -117,7 +148,10 @@ const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
                 placeholder={isRecording ? '正在聆聽...' : '例如：我想推出一個 AI 客製化寵物飲食訂閱服務，目標是有機飼主市場，預計第一年營收 300 萬...'}
                 value={quickText}
                 onChange={(e) => setQuickText(e.target.value)}
-                disabled={isRecording || isProcessingInput}
+                disabled={isRecording || busy}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuickSubmit(); }
+                }}
               />
               {isRecording && (
                 <div className="recording-badge">
@@ -127,11 +161,11 @@ const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
             </div>
             <div className="mic-section">
               {!isRecording ? (
-                <button onClick={startRecording} disabled={isProcessingInput} className="mic-btn" title="開始錄音">
+                <button onClick={startRecording} disabled={busy} className="mic-btn" title="開始錄音">
                   <Mic size={24} />
                 </button>
               ) : (
-                <button onClick={stopRecording} className="mic-btn-stop" title="停止並處理">
+                <button onClick={stopRecording} className="mic-btn-stop" title="停止並分析">
                   <StopCircle size={32} />
                 </button>
               )}
@@ -139,48 +173,82 @@ const InputForm: React.FC<Props> = ({ onAnalyze, isLoading }) => {
             </div>
             <div className="quick-footer">
               <button
-                onClick={() => handleProcessInput()}
-                disabled={isProcessingInput || (!quickText.trim() && !isRecording)}
-                className={`process-btn ${isProcessingInput || (!quickText.trim() && !isRecording) ? 'disabled' : 'enabled'}`}
+                onClick={handleQuickSubmit}
+                disabled={busy || (!quickText.trim() && !isRecording)}
+                className={`process-btn ${busy || (!quickText.trim() && !isRecording) ? 'disabled' : 'enabled'}`}
               >
-                {isProcessingInput
-                  ? <><Loader2 size={20} /> 正在整理資料...</>
-                  : <><Sparkles size={20} /> AI 自動填寫表單</>}
+                {busy
+                  ? <><Loader2 size={20} className="spin-icon" /> 掃描中...</>
+                  : <><Sparkles size={20} /> 開始 AI 掃描 <ArrowRight size={18} /></>}
               </button>
             </div>
           </div>
         )}
 
-        {inputMethod === 'manual' && (
-          <form onSubmit={handleSubmit}>
-            {feedback && (
-              <div className="feedback-box">
-                <Sparkles size={20} style={{flexShrink:0}} />
-                <div><strong>AI 助理：</strong>{feedback}</div>
-              </div>
-            )}
-            <div className="fields-grid">
-              {fields.map(({ key, label, placeholder }) => (
-                <div key={key} className={`field-wrap ${key === 'idea' ? 'full' : ''}`}>
-                  <label>{label}</label>
-                  <textarea
-                    className="field-textarea"
-                    placeholder={placeholder}
-                    value={formData[key]}
-                    onChange={(e) => setFormData(p => ({ ...p, [key]: e.target.value }))}
-                    required
-                  />
-                </div>
-              ))}
+        {/* ── File Upload ── */}
+        {inputMethod === 'file' && (
+          <div className="file-upload-section">
+            <div className="quick-heading">
+              <h2>上傳提案文件</h2>
+              <p>上傳 PDF 商業計畫書、截圖、或純文字檔案，AI 會自動提取關鍵資訊並進入深度對話分析。</p>
             </div>
-            <div className="submit-row">
-              <button type="submit" disabled={isLoading} className="submit-btn">
-                {isLoading
-                  ? <><Loader2 size={22} /> 董事會分析中...</>
-                  : <>開始 AI 分析 <ArrowRight size={22} /></>}
+
+            <div
+              className={`file-drop-zone ${isDragging ? 'file-drop-zone-active' : ''} ${uploadedFile ? 'file-drop-zone-filled' : ''}`}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleFileDrop}
+              onClick={() => !uploadedFile && fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_EXTENSIONS}
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
+              {!uploadedFile ? (
+                <div className="file-drop-empty">
+                  <Paperclip size={36} style={{ color: '#475569', marginBottom: 12 }} />
+                  <div className="file-drop-title">拖放檔案至此，或點擊選擇</div>
+                  <div className="file-drop-hint">支援格式：PDF · PNG · JPG · WEBP · TXT　最大 20MB</div>
+                </div>
+              ) : (
+                <div className="file-drop-filled">
+                  {fileTypeIcon(uploadedFile.type)}
+                  <div className="file-info">
+                    <div className="file-name">{uploadedFile.name}</div>
+                    <div className="file-size">{(uploadedFile.size / 1024).toFixed(0)} KB · {uploadedFile.type}</div>
+                  </div>
+                  <button
+                    className="file-remove-btn"
+                    onClick={(e) => { e.stopPropagation(); setUploadedFile(null); }}
+                    title="移除檔案"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="file-format-list">
+              <div className="file-format-item"><FileText size={14} style={{ color: '#f87171' }} /> PDF 商業計畫書、提案書</div>
+              <div className="file-format-item"><Image size={14} style={{ color: '#34d399' }} /> 截圖、簡報圖片（PNG/JPG/WEBP）</div>
+              <div className="file-format-item"><File size={14} style={{ color: '#94a3b8' }} /> 純文字檔案（TXT）</div>
+            </div>
+
+            <div className="quick-footer">
+              <button
+                onClick={handleProcessFile}
+                disabled={!uploadedFile || busy}
+                className={`process-btn ${!uploadedFile || busy ? 'disabled' : 'enabled'}`}
+              >
+                {isProcessingFile
+                  ? <><Loader2 size={20} className="spin-icon" /> AI 解析檔案中...</>
+                  : <><Sparkles size={20} /> AI 解析並開始分析 <ArrowRight size={18} /></>}
               </button>
             </div>
-          </form>
+          </div>
         )}
       </div>
     </div>
